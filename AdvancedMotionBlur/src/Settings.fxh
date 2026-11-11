@@ -1,9 +1,10 @@
-// Reload the effect after editing. Distances are in output pixels.
+// Reload the effect after editing.
 #define MB_QUALITY 1              // Tap spacing along the streak: 0: 4 px; 1: 2 px; 2: 1 px; 3: fixed 16 taps (0.2.0)
 #define MB_SHUTTER_ANGLE 180.0     // Relative to a 30 fps frame, at any export rate
 #define MB_MOTION_SCALE 1.3
+#define MB_SCALE_STREAK_WITH_HEIGHT 1 // 1: streak limits and dead zone use 1080p reference pixels
 #define MB_MAX_STREAK 64.0         // Full streak, half on either side
-#define MB_SPEED_THRESHOLD 3.0     // Streak px removed from every pixel; slow parts stay sharp
+#define MB_SPEED_THRESHOLD 3.0     // Length removed from the streak; slow parts stay sharp
 #define MB_DEPTH_TOLERANCE 0.045   // Log2 depth tolerance; roughly 3% before soft falloff
 #define MB_CUT_ANGLE_COS 0.7660444 // 40 degree orientation change
 #define MB_CUT_SCREEN_HEIGHT 0.15  // Screen displacement as a fraction of height; 0 disables this test

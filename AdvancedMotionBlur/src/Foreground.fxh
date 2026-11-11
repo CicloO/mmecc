@@ -87,7 +87,7 @@ bool FrameHasExposure()
 // separately so a layer change cannot borrow the wrong motion.
 void AccumulateTile(inout TileReduction best, float3 candidate, float nearest, float lengthSquared)
 {
-    if (lengthSquared >= MinStreak * MinStreak) {
+    if (lengthSquared >= MinStreak() * MinStreak()) {
         best.nearest = min(best.nearest, nearest);
         if (lengthSquared > best.primary.a) {
             best.primary = float4(candidate, lengthSquared);
@@ -156,7 +156,7 @@ float4 BuildTileAlternate(float2 quadUV : TEXCOORD0) : COLOR0
     float2 tileUV = (tile + 0.5) / rasterSize;
     float4 primary = tex2Dlod(TileSampler, float4(tileUV, 0.0, 0.0));
     [branch]
-    if (dot(primary.rg, primary.rg) < MinStreak * MinStreak) {
+    if (dot(primary.rg, primary.rg) < MinStreak() * MinStreak()) {
         return 0.0;
     }
     float2 tileSpan = ScreenSize / rasterSize;
@@ -172,7 +172,7 @@ float4 BuildTileAlternate(float2 quadUV : TEXCOORD0) : COLOR0
             float2 uv = (first + float2(i, j) + 0.5) / ScreenSize;
             float3 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0)).rgb;
             float lengthSquared = dot(motion.rg, motion.rg);
-            if (lengthSquared >= MinStreak * MinStreak && lengthSquared > best.a &&
+            if (lengthSquared >= MinStreak() * MinStreak() && lengthSquared > best.a &&
                 abs(motion.b - primary.a) > 2.0 * DepthTolerance) {
                 best = float4(motion, lengthSquared);
             }
@@ -236,7 +236,7 @@ float4 ReduceNeighbors(float2 quadUV, bool alternate)
         float2 tileUV = (tile + 0.5) / rasterSize;
         float4 primary = tex2Dlod(NeighborSampler, float4(tileUV, 0.0, 0.0));
         [branch]
-        if (dot(primary.rg, primary.rg) < MinStreak * MinStreak) return 0.0;
+        if (dot(primary.rg, primary.rg) < MinStreak() * MinStreak()) return 0.0;
         primaryDepth = primary.a;
     }
 #endif
@@ -283,17 +283,17 @@ float3 ExtendForeground(float2 uv, float3 background, float4 center)
 #endif
     bool hasDepth = center.a >= 0.5;
     float streakLength = length(neighbor.rg);
-    if (streakLength < MinStreak || (hasDepth && center.b - neighbor.b <= DepthTolerance)) {
+    if (streakLength < MinStreak() || (hasDepth && center.b - neighbor.b <= DepthTolerance)) {
         return background;
     }
 
     float2 direction = neighbor.rg / streakLength;
     float reach = 0.5 * streakLength + 0.75;
-    int taps = (int)min(64.0, ceil(2.0 * reach));
+    int taps = (int)min(StreakTapBudget(64.0), ceil(2.0 * reach));
     float spacing = 2.0 * reach / taps;
     float2 centerPixel = uv * ScreenSize;
     float4 exposure = 0.0;
-    [loop]
+    [fastopt]
     for (int tap = 0; tap < taps; ++tap) {
         float offset = (tap + 0.5) * spacing - reach;
         float2 samplePixel = floor(centerPixel + offset * direction) + 0.5;
@@ -308,7 +308,7 @@ float3 ExtendForeground(float2 uv, float3 background, float4 center)
         }
 #endif
         float sourceLength = length(source.rg);
-        if (sourceLength < MinStreak || (hasDepth && center.b - source.b <= DepthTolerance)) {
+        if (sourceLength < MinStreak() || (hasDepth && center.b - source.b <= DepthTolerance)) {
             continue;
         }
 
@@ -347,7 +347,7 @@ float3 ExtendForeground(float2 uv, float3 background, float4 center)
     }
     float4 primary = tex2Dlod(NeighborSampler, float4(uv, 0.0, 0.0));
     float4 alternate = tex2Dlod(NeighborAlternateSampler, float4(uv, 0.0, 0.0));
-    bool twoLayers = dot(alternate.rg, alternate.rg) >= MinStreak * MinStreak;
+    bool twoLayers = dot(alternate.rg, alternate.rg) >= MinStreak() * MinStreak();
     bool primaryIsFar = primary.a > alternate.a;
     float3 farLayer = primaryIsFar ? primary.rgb : alternate.rgb;
     float3 nearLayer = primaryIsFar ? alternate.rgb : primary.rgb;

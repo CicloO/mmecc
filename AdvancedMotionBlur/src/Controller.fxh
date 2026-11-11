@@ -30,17 +30,17 @@ float MotionStrength()
 
 float MotionStreakLimit()
 {
-    return max(MB_MAX_STREAK, 0.0) *
+    return StreakPixelScale() * max(MB_MAX_STREAK, 0.0) *
         (1.0 + ControllerWeight(ControlStreakUp) - ControllerWeight(ControlStreakDown));
 }
 
-// Threshold adds up to 16 px on top of the setting.
+// Threshold adds up to 16 reference pixels on top of the setting.
 static const float ThresholdMorphRange = 16.0;
 
 float MotionSpeedThreshold()
 {
-    return max(MB_SPEED_THRESHOLD, 0.0)
-        + ThresholdMorphRange * ControllerWeight(ControlThreshold);
+    return StreakPixelScale() * (max(MB_SPEED_THRESHOLD, 0.0)
+        + ThresholdMorphRange * ControllerWeight(ControlThreshold));
 }
 
 float MotionShutter()

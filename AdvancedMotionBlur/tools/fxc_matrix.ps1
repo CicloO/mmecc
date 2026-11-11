@@ -16,6 +16,8 @@ $settings = Get-Content (Join-Path $Src 'Settings.fxh') -Raw
 $settings = [regex]::Replace($settings, '(?m)^#define MB_DEBUG\s+\S+', '#define MB_DEBUG 0')
 $cases = @(
     @{ Name = 'default'; Set = @{} },
+    @{ Name = 'height0'; Set = @{ MB_SCALE_STREAK_WITH_HEIGHT = '0' } },
+    @{ Name = 'height0layered'; Set = @{ MB_SCALE_STREAK_WITH_HEIGHT = '0'; MB_LAYERED_TRAIL = '1' } },
     @{ Name = 'q0'; Set = @{ MB_QUALITY = '0' } },
     @{ Name = 'q2'; Set = @{ MB_QUALITY = '2' } },
     @{ Name = 'q3'; Set = @{ MB_QUALITY = '3' } },
@@ -46,7 +48,7 @@ $cases = @(
     @{ Name = 'worldnoteleport'; Set = @{ MB_KEEP_OBJECT_MOTION_ON_CUT = '1'; MB_TELEPORT_DISTANCE = '0.0' } },
     @{ Name = 'thresh8'; Set = @{ MB_SPEED_THRESHOLD = '8.0' } },
     @{ Name = 'thresh8p0'; Set = @{ MB_SPEED_THRESHOLD = '8.0'; MB_EXTEND_FOREGROUND = '0' } },
-    @{ Name = 'legacy020'; Set = @{ MB_SHUTTER_ANGLE = '180.0'; MB_MOTION_SCALE = '1.0'; MB_MAX_STREAK = '48.0'; MB_SPEED_THRESHOLD = '0.0' } }
+    @{ Name = 'legacy020'; Set = @{ MB_SHUTTER_ANGLE = '180.0'; MB_MOTION_SCALE = '1.0'; MB_MAX_STREAK = '48.0'; MB_SPEED_THRESHOLD = '0.0'; MB_SCALE_STREAK_WITH_HEIGHT = '0' } }
 )
 $fail = 0
 foreach ($case in $cases) {

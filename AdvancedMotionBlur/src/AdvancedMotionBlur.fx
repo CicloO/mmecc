@@ -1,5 +1,17 @@
 #include "Settings.fxh"
 #include "Fullscreen.fxh"
+
+float2 ScreenSize : VIEWPORTPIXELSIZE;
+
+float StreakPixelScale()
+{
+#if MB_SCALE_STREAK_WITH_HEIGHT
+    return ScreenSize.y / 1080.0;
+#else
+    return 1.0;
+#endif
+}
+
 #include "Controller.fxh"
 #include "HistoryTargets.fxh"
 
@@ -11,7 +23,6 @@ float Script : STANDARDSGLOBAL <
     string ScriptOrder = "postprocess";
 > = 0.8;
 
-float2 ScreenSize : VIEWPORTPIXELSIZE;
 float4x4 ViewProjection : VIEWPROJECTION;
 float4x4 InverseViewProjection : VIEWPROJECTIONINVERSE;
 float4x4 View : VIEW;
@@ -116,7 +127,17 @@ float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
     return delta * (extent / distance);
 }
 
-static const float MinStreak = 0.75;
+float MinStreak()
+{
+    return 0.75 * StreakPixelScale();
+}
+
+float StreakTapBudget(float referenceTaps)
+{
+    // Leave room for high-resolution taps within the ps_3_0 loop limit.
+    return min(255.0, ceil(referenceTaps * max(1.0, StreakPixelScale())));
+}
+
 static const float DepthTolerance = max(MB_DEPTH_TOLERANCE, 0.0001);
 
 #if MB_USE_FOREGROUND
@@ -161,8 +182,6 @@ static const float MinTaps = 4.0;
 static const float MaxTaps = 128.0;
 #elif MB_QUALITY == 3
 // 0.2.0 kernel: always 16 taps spread over the streak, for side-by-side tests.
-static const float TapSpacing = 1.0;
-static const float MinTaps = 16.0;
 static const float MaxTaps = 16.0;
 #else
 static const float TapSpacing = 2.0;
@@ -174,17 +193,22 @@ float3 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 {
     bool outline = geometry.a > 3.5;
     float streakLength = length(streak);
-    if (streakLength < MinStreak || (color.a <= 0.004 && !outline)) {
+    if (streakLength < MinStreak() || (color.a <= 0.004 && !outline)) {
         return color.rgb;
     }
 
-    int taps = (int)clamp(ceil(streakLength / TapSpacing), MinTaps, MaxTaps);
+#if MB_QUALITY == 3
+    int taps = (int)MaxTaps;
+#else
+    int taps = (int)clamp(ceil(streakLength / TapSpacing), MinTaps, StreakTapBudget(MaxTaps));
+#endif
     // Keep the centre's share of the total the same as the old 16-tap kernel
     // (2/16 for surfaces, 0.75/16 for outlines).
     float weightSum = taps * (outline ? 0.046875 : 0.125);
     float3 sum = color.rgb * weightSum;
     float2 stepUV = streak / ScreenSize;
-    [loop]
+    // The tap budget varies with viewport height in the legacy effect compiler.
+    [fastopt]
     for (int tap = 0; tap < taps; ++tap) {
         float t = (tap + 0.5) / taps - 0.5;
         float2 tapUV = uv + t * stepUV;
