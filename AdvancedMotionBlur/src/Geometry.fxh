@@ -141,9 +141,12 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
     bool valid = FitsAtlas(index) && stored.w <= -1.0
         && dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP
         && cameraTiming.w == CameraHistoryTag && abs(cameraTiming.x - previousTime) <= MB_MIN_FRAME_GAP;
+    float3 shift = mul(position, ObjectToWorld).xyz - stored.xyz;
+    bool teleported = MB_TELEPORT_DISTANCE > 0.0
+        && dot(shift, shift) > MB_TELEPORT_DISTANCE * MB_TELEPORT_DISTANCE;
     output.previousClip = 0.0;
     output.previousLocalClip = 0.0;
-    if (valid) {
+    if (valid && !teleported) {
         float4 world = float4(stored.xyz, 1.0);
         float4 oldClip = mul(world, HistoryViewProjection());
         float4 localClip = mul(world, WorldToClip);

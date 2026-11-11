@@ -23,3 +23,4 @@
 #define MB_AUTO_MODEL_MOTION 1     // PMD/PMX use vertex history by default
 #define MB_HISTORY_SIZE 512        // Square vertex atlas used by MotionGeometry.fx
 #define MB_KEEP_OBJECT_MOTION_ON_CUT 0 // 1: store world-space history and keep model motion across cuts
+#define MB_TELEPORT_DISTANCE 50.0  // World units per history interval; 0 disables the check

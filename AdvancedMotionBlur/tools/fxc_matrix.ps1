@@ -43,6 +43,7 @@ $cases = @(
     @{ Name = 'worldp0'; Set = @{ MB_KEEP_OBJECT_MOTION_ON_CUT = '1'; MB_EXTEND_FOREGROUND = '0' } },
     @{ Name = 'worlddbg2'; Set = @{ MB_KEEP_OBJECT_MOTION_ON_CUT = '1'; MB_DEBUG = '2' } },
     @{ Name = 'worldlayered'; Set = @{ MB_KEEP_OBJECT_MOTION_ON_CUT = '1'; MB_LAYERED_TRAIL = '1' } },
+    @{ Name = 'worldnoteleport'; Set = @{ MB_KEEP_OBJECT_MOTION_ON_CUT = '1'; MB_TELEPORT_DISTANCE = '0.0' } },
     @{ Name = 'thresh8'; Set = @{ MB_SPEED_THRESHOLD = '8.0' } },
     @{ Name = 'thresh8p0'; Set = @{ MB_SPEED_THRESHOLD = '8.0'; MB_EXTEND_FOREGROUND = '0' } },
     @{ Name = 'legacy020'; Set = @{ MB_SHUTTER_ANGLE = '180.0'; MB_MOTION_SCALE = '1.0'; MB_MAX_STREAK = '48.0'; MB_SPEED_THRESHOLD = '0.0' } }
