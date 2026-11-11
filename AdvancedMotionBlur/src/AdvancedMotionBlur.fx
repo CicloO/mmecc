@@ -16,6 +16,7 @@ float StreakPixelScale()
 #include "HistoryTargets.fxh"
 
 #define MB_USE_FOREGROUND (MB_EXTEND_FOREGROUND && MB_DEBUG == 0)
+#define MB_USE_TRAIL_ALPHA (MB_TRAIL_ALPHA && MB_DEBUG == 0)
 
 float Script : STANDARDSGLOBAL <
     string ScriptOutput = "color";
@@ -30,7 +31,12 @@ float4x4 Projection : PROJECTION;
 float Timeline : TIME < bool SyncInEditMode = true; >;
 float AccessoryScale : CONTROLOBJECT < string name = "(self)"; >;
 
+#if MB_USE_TRAIL_ALPHA
+static const float4 ClearColor = {MB_CLEAR_RGBA};
+float4 SceneClear = float4(ClearColor.rgb * ClearColor.a, ClearColor.a);
+#else
 float4 SceneClear = {MB_CLEAR_RGBA};
+#endif
 float DepthClear = 1.0;
 
 texture SceneColor : RENDERCOLORTARGET < string Format = "A8R8G8B8"; >;
@@ -189,12 +195,12 @@ static const float MinTaps = 4.0;
 static const float MaxTaps = 64.0;
 #endif
 
-float3 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
+float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 {
     bool outline = geometry.a > 3.5;
     float streakLength = length(streak);
     if (streakLength < MinStreak() || (color.a <= 0.004 && !outline)) {
-        return color.rgb;
+        return color;
     }
 
 #if MB_QUALITY == 3
@@ -205,7 +211,11 @@ float3 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
     // Keep the centre's share of the total the same as the old 16-tap kernel
     // (2/16 for surfaces, 0.75/16 for outlines).
     float weightSum = taps * (outline ? 0.046875 : 0.125);
+#if MB_USE_TRAIL_ALPHA
+    float4 sum = color * weightSum;
+#else
     float3 sum = color.rgb * weightSum;
+#endif
     float2 stepUV = streak / ScreenSize;
     // The tap budget varies with viewport height in the legacy effect compiler.
     [fastopt]
@@ -220,12 +230,22 @@ float3 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
         float4 tapGeometry = tex2Dlod(GeometrySampler, float4(tapUV, 0.0, 0.0));
 #endif
         float4 tapColor = tex2Dlod(SceneTapSampler, float4(tapUV, 0.0, 0.0));
+#if MB_USE_TRAIL_ALPHA
+        // Capture already stores premultiplied color, so average RGBA with the same weights.
+        float weight = inside * TapWeight(geometry, tapGeometry, 1.0);
+        sum += tapColor * weight;
+#else
         float alpha = tapGeometry.a > 3.5 ? 1.0 : tapColor.a;
         float weight = inside * TapWeight(geometry, tapGeometry, alpha);
         sum += tapColor.rgb * weight;
+#endif
         weightSum += weight;
     }
+#if MB_USE_TRAIL_ALPHA
     return sum / weightSum;
+#else
+    return float4(sum / weightSum, color.a);
+#endif
 }
 
 float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
@@ -237,9 +257,8 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     return color;
 #elif MB_USE_FOREGROUND
     float4 geometry = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
-    color.rgb = BlurSurface(uv, color, geometry, geometry.rg);
-    color.rgb = ExtendForeground(uv, color.rgb, geometry);
-    return color;
+    color = BlurSurface(uv, color, geometry, geometry.rg);
+    return ExtendForeground(uv, color, geometry);
 #else
     float4 geometry = tex2Dlod(GeometrySampler, float4(uv, 0.0, 0.0));
 #if MB_DEBUG == 3
@@ -266,7 +285,7 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     return float4(0.5 + 0.5 * clamp(streak / limit, -1.0, 1.0),
                   saturate(length(streak) / limit), 1.0);
 #else
-    return float4(BlurSurface(uv, color, geometry, streak), color.a);
+    return BlurSurface(uv, color, geometry, streak);
 #endif
 #endif
 #endif

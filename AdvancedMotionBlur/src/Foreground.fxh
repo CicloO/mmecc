@@ -270,11 +270,11 @@ float4 BuildNeighborAlternate(float2 quadUV : TEXCOORD0) : COLOR0
     return ReduceNeighbors(quadUV, true);
 }
 
-float3 GatherForeground(float2 uv, float3 background, float4 center, float3 neighbor,
+float4 GatherForeground(float2 uv, float4 background, float4 center, float3 neighbor,
                         float splitDepth, float depthSide)
 {
 #else
-float3 ExtendForeground(float2 uv, float3 background, float4 center)
+float4 ExtendForeground(float2 uv, float4 background, float4 center)
 {
     if (center.a > 2.5 && center.a < 3.5) {
         return background;
@@ -330,17 +330,28 @@ float3 ExtendForeground(float2 uv, float3 background, float4 center)
         }
         if (support > 0.0) {
             float4 sourceColor = tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0));
+#if MB_USE_TRAIL_ALPHA
+            float weight = support * spacing / max(1.0, sourceLength);
+            exposure += sourceColor * weight;
+#else
             float alpha = source.a > 3.5 ? 1.0 : sourceColor.a;
             float weight = support * alpha * spacing / max(1.0, sourceLength);
             exposure += float4(sourceColor.rgb, 1.0) * weight;
+#endif
         }
     }
+#if MB_USE_TRAIL_ALPHA
+    // Clamp coverage for overlapping taps and keep their average color.
+    exposure /= max(1.0, exposure.a);
+    return exposure + background * (1.0 - exposure.a);
+#else
     float3 foreground = exposure.rgb / max(exposure.a, 0.0001);
-    return lerp(background, foreground, saturate(exposure.a));
+    return float4(lerp(background.rgb, foreground, saturate(exposure.a)), background.a);
+#endif
 }
 
 #if MB_LAYERED_TRAIL
-float3 ExtendForeground(float2 uv, float3 background, float4 center)
+float4 ExtendForeground(float2 uv, float4 background, float4 center)
 {
     if (center.a > 2.5 && center.a < 3.5) {
         return background;
