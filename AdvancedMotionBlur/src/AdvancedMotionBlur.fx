@@ -216,6 +216,13 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     }
     return float4(geometry.a > 2.5, geometry.a > 1.5 && geometry.a < 2.5,
                   geometry.a > 0.5 && geometry.a < 1.5, 1.0);
+#elif MB_DEBUG == 5
+    if (geometry.a < 4.5) {
+        return float4(0.0, 0.0, 0.0, 1.0);
+    }
+    bool direct = geometry.r <= 0.05;
+    bool transformed = geometry.g <= 0.05;
+    return float4(!transformed, direct, transformed && !direct, 1.0);
 #else
     float4 camera = CurrentCameraAnalysis();
     float2 streak = ExposureStreak(quadUV, geometry, CameraBlurInterval(camera), camera.y);

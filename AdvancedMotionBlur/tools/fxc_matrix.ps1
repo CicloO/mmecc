@@ -33,6 +33,7 @@ $cases = @(
     @{ Name = 'dbg2'; Set = @{ MB_DEBUG = '2' } },
     @{ Name = 'dbg3'; Set = @{ MB_DEBUG = '3' } },
     @{ Name = 'dbg4'; Set = @{ MB_DEBUG = '4' } },
+    @{ Name = 'dbg5'; Set = @{ MB_DEBUG = '5' } },
     @{ Name = 'p0'; Set = @{ MB_EXTEND_FOREGROUND = '0' } },
     @{ Name = 'nooutline'; Set = @{ MB_OUTLINE_MOTION = '0' } },
     @{ Name = 'noauto'; Set = @{ MB_AUTO_MODEL_MOTION = '0' } },

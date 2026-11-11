@@ -57,6 +57,20 @@ bool FitsAtlas(int index)
 }
 #endif
 
+#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
+float4x4 DiagnosticWorld : WORLD;
+float4x4 DiagnosticViewProjection : VIEWPROJECTION;
+
+float ProjectionError(float4 expected, float4 projected)
+{
+    if (expected.w <= 0.0001 || projected.w <= 0.0001) {
+        return 65504.0;
+    }
+    float2 delta = (expected.xy / expected.w - projected.xy / projected.w) * (0.5 * TargetSize);
+    return min(length(delta), 65504.0);
+}
+#endif
+
 struct GeometryOutput {
     float4 position : POSITION;
     float2 uv : TEXCOORD0;
@@ -64,6 +78,9 @@ struct GeometryOutput {
 #if MB_VERTEX_HISTORY
     float4 previousClip : TEXCOORD2;
     float3 currentClip : TEXCOORD3;
+#endif
+#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
+    float2 projectionError : TEXCOORD4;
 #endif
 };
 
@@ -77,6 +94,11 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
     output.position = mul(position, ObjectToClip);
     output.uv = uv;
     output.viewDepth = mul(position, ObjectToView).z;
+#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
+    output.projectionError = float2(
+        ProjectionError(output.position, mul(position, DiagnosticViewProjection)),
+        ProjectionError(output.position, mul(mul(position, DiagnosticWorld), DiagnosticViewProjection)));
+#endif
 #if MB_VERTEX_HISTORY
     float2 atlasUV = (AtlasCell(index) + 0.5) / MB_HISTORY_SIZE;
     float4 stored = tex2Dlod(PreviousSampler, float4(atlasUV, 0.0, 0.0));
@@ -103,6 +125,9 @@ float4 DepthPixel(GeometryOutput input) : COLOR0
     float alpha = MaterialCoverage(input.uv);
     clip(alpha - 0.004);
     float depth = log2(max(input.viewDepth, 0.0001));
+#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
+    return float4(input.projectionError, depth, 5.0);
+#else
     float coverage = (alpha >= 0.985 && !opadd) ? 1.0 : 3.0;
 #if MB_VERTEX_HISTORY
     if (coverage == 1.0 && input.previousClip.w > 0.999 && input.currentClip.z > 0.0001) {
@@ -113,6 +138,7 @@ float4 DepthPixel(GeometryOutput input) : COLOR0
     }
 #endif
     return float4(0.0, 0.0, depth, coverage);
+#endif
 }
 
 #define MB_GEOMETRY_STATE \
