@@ -43,7 +43,7 @@ float4 BuildMotionField(float2 quadUV : TEXCOORD0) : COLOR0
         geometry = ResolveOutline(uv, geometry, offset, coverage);
     }
 #endif
-    float2 streak = ExposureStreak(quadUV + offset, geometry, dt, exposure);
+    float2 streak = ExposureStreak(quadUV + offset, geometry, camera);
     return float4(streak, geometry.b, coverage);
 }
 

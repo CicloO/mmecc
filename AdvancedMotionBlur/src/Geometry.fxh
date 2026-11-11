@@ -1,5 +1,16 @@
 #include "Settings.fxh"
 
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+#include "HistoryTargets.fxh"
+#define MB_CUT_TARGET_ON "RenderColorTarget0=;RenderDepthStencilTarget=;RenderColorTarget1=AMB_CutMotion;"
+#define MB_CUT_TARGET_OFF "RenderColorTarget1=;"
+#define MB_CUT_TARGET_STATE ColorWriteEnable1 = 15;
+#else
+#define MB_CUT_TARGET_ON ""
+#define MB_CUT_TARGET_OFF ""
+#define MB_CUT_TARGET_STATE
+#endif
+
 float4x4 ObjectToClip : WORLDVIEWPROJECTION;
 float4x4 ObjectToView : WORLDVIEW;
 float4 MaterialColor : DIFFUSE < string Object = "Geometry"; >;
@@ -44,6 +55,20 @@ texture AtlasDepth : RENDERDEPTHSTENCILTARGET <
 sampler2D CurrentSampler = sampler_state { Texture = <CurrentVertices>; MB_ATLAS_FILTER };
 sampler2D PreviousSampler = sampler_state { Texture = <PreviousVertices>; MB_ATLAS_FILTER };
 
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+sampler2D HistoryCameraSampler = sampler_state { Texture = <AMB_CameraHistory>; MB_ATLAS_FILTER };
+
+float4 HistoryCameraSlot(float index)
+{
+    return tex2Dlod(HistoryCameraSampler, float4((index + 0.5) / 8.0, 0.5, 0.0, 0.0));
+}
+
+float4x4 HistoryViewProjection()
+{
+    return float4x4(HistoryCameraSlot(0.0), HistoryCameraSlot(1.0), HistoryCameraSlot(2.0), HistoryCameraSlot(3.0));
+}
+#endif
+
 float2 AtlasCell(int index)
 {
     float row = floor((float)index / MB_HISTORY_SIZE);
@@ -57,10 +82,12 @@ bool FitsAtlas(int index)
 }
 #endif
 
-#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
-float4x4 DiagnosticWorld : WORLD;
-float4x4 DiagnosticViewProjection : VIEWPROJECTION;
+#if MB_VERTEX_HISTORY && (MB_DEBUG == 5 || MB_KEEP_OBJECT_MOTION_ON_CUT)
+float4x4 ObjectToWorld : WORLD;
+float4x4 WorldToClip : VIEWPROJECTION;
+#endif
 
+#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
 float ProjectionError(float4 expected, float4 projected)
 {
     if (expected.w <= 0.0001 || projected.w <= 0.0001) {
@@ -82,6 +109,9 @@ struct GeometryOutput {
 #if MB_DEBUG == 5 && MB_VERTEX_HISTORY
     float2 projectionError : TEXCOORD4;
 #endif
+#if MB_KEEP_OBJECT_MOTION_ON_CUT && MB_VERTEX_HISTORY
+    float4 previousLocalClip : TEXCOORD5;
+#endif
 };
 
 GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
@@ -96,16 +126,36 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
     output.viewDepth = mul(position, ObjectToView).z;
 #if MB_DEBUG == 5 && MB_VERTEX_HISTORY
     output.projectionError = float2(
-        ProjectionError(output.position, mul(position, DiagnosticViewProjection)),
-        ProjectionError(output.position, mul(mul(position, DiagnosticWorld), DiagnosticViewProjection)));
+        ProjectionError(output.position, mul(position, WorldToClip)),
+        ProjectionError(output.position, mul(mul(position, ObjectToWorld), WorldToClip)));
 #endif
 #if MB_VERTEX_HISTORY
     float2 atlasUV = (AtlasCell(index) + 0.5) / MB_HISTORY_SIZE;
     float4 stored = tex2Dlod(PreviousSampler, float4(atlasUV, 0.0, 0.0));
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+    // World histories carry a negative timestamp, so an older clip-space atlas
+    // cannot be mistaken for world positions after a reload.
+    float previousTime = -stored.w - 1.0;
+    float dt = Timeline - previousTime;
+    float4 cameraTiming = HistoryCameraSlot(4.0);
+    bool valid = FitsAtlas(index) && stored.w <= -1.0
+        && dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP
+        && cameraTiming.w == CameraHistoryTag && abs(cameraTiming.x - previousTime) <= MB_MIN_FRAME_GAP;
+    output.previousClip = 0.0;
+    output.previousLocalClip = 0.0;
+    if (valid) {
+        float4 world = float4(stored.xyz, 1.0);
+        float4 oldClip = mul(world, HistoryViewProjection());
+        float4 localClip = mul(world, WorldToClip);
+        output.previousClip = oldClip.w > 0.0001 ? float4(oldClip.xyw, 1.0) : 0.0;
+        output.previousLocalClip = localClip.w > 0.0001 ? float4(localClip.xyw, 1.0) : 0.0;
+    }
+#else
     float dt = Timeline - (stored.w - 1.0);
     bool valid = FitsAtlas(index) && stored.w >= 1.0 && stored.z > 0.0001
         && dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP;
     output.previousClip = valid ? float4(stored.xyz, 1.0) : 0.0;
+#endif
     output.currentClip = output.position.xyw;
 #endif
     return output;
@@ -120,7 +170,16 @@ float MaterialCoverage(float2 uv)
     return alpha;
 }
 
-float4 DepthPixel(GeometryOutput input) : COLOR0
+#if MB_VERTEX_HISTORY
+float2 GeometryMotion(float3 currentClip, float3 previousClip)
+{
+    float2 now = currentClip.xy / currentClip.z;
+    float2 then = previousClip.xy / previousClip.z;
+    return clamp((now - then) * float2(0.5, -0.5) * TargetSize, -16384.0, 16384.0);
+}
+#endif
+
+float4 SurfaceDepth(GeometryOutput input)
 {
     float alpha = MaterialCoverage(input.uv);
     clip(alpha - 0.004);
@@ -131,21 +190,45 @@ float4 DepthPixel(GeometryOutput input) : COLOR0
     float coverage = (alpha >= 0.985 && !opadd) ? 1.0 : 3.0;
 #if MB_VERTEX_HISTORY
     if (coverage == 1.0 && input.previousClip.w > 0.999 && input.currentClip.z > 0.0001) {
-        float2 now = input.currentClip.xy / input.currentClip.z;
-        float2 then = input.previousClip.xy / input.previousClip.z;
-        float2 motion = (now - then) * float2(0.5, -0.5) * TargetSize;
-        return float4(clamp(motion, -16384.0, 16384.0), depth, 2.0);
+        return float4(GeometryMotion(input.currentClip, input.previousClip.xyz), depth, 2.0);
     }
 #endif
     return float4(0.0, 0.0, depth, coverage);
 #endif
 }
 
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+struct DepthTargets {
+    float4 primary : COLOR0;
+    float4 cutMotion : COLOR1;
+};
+
+DepthTargets DepthPixel(GeometryOutput input)
+{
+    DepthTargets output;
+    output.primary = SurfaceDepth(input);
+    output.cutMotion = 0.0;
+#if MB_VERTEX_HISTORY
+    if (output.primary.a <= 2.5 && input.previousLocalClip.w > 0.999 && input.currentClip.z > 0.0001) {
+        float2 motion = GeometryMotion(input.currentClip, input.previousLocalClip.xyz);
+        output.cutMotion = float4(motion, output.primary.b, 1.0);
+    }
+#endif
+    return output;
+}
+#else
+float4 DepthPixel(GeometryOutput input) : COLOR0
+{
+    return SurfaceDepth(input);
+}
+#endif
+
 #define MB_GEOMETRY_STATE \
     AlphaBlendEnable = FALSE; AlphaTestEnable = FALSE; \
     ZEnable = TRUE; ZWriteEnable = TRUE; ZFunc = LESSEQUAL; \
     CullMode = NONE; FillMode = SOLID; StencilEnable = FALSE; \
     SRGBWriteEnable = FALSE; ColorWriteEnable = 15; \
+    MB_CUT_TARGET_STATE \
     VertexShader = compile vs_3_0 ProjectGeometry(); \
     PixelShader = compile ps_3_0 DepthPixel();
 
@@ -161,8 +244,11 @@ AtlasVertex RecordVertex(float4 position : POSITION, int index : _INDEX)
     float2 cell = AtlasCell(index);
     float2 clipXY = (cell * (2.0 / MB_HISTORY_SIZE) - 1.0) * float2(1.0, -1.0);
     output.position = FitsAtlas(index) ? float4(clipXY, 0.0, 1.0) : float4(4.0, 4.0, 0.0, 1.0);
-    float4 projected = mul(position, ObjectToClip);
-    output.data = float4(projected.xyw, Timeline + 1.0);
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+    output.data = float4(mul(position, ObjectToWorld).xyz, -(Timeline + 1.0));
+#else
+    output.data = float4(mul(position, ObjectToClip).xyw, Timeline + 1.0);
+#endif
     return output;
 }
 
@@ -190,7 +276,9 @@ float4 CopyAtlas(float2 quadUV : TEXCOORD0) : COLOR0
     "RenderColorTarget0=;" \
     "RenderDepthStencilTarget=;"
 #define MB_RECORD_SCRIPT \
+    MB_CUT_TARGET_ON \
     "Pass=WriteGeometry;" \
+    MB_CUT_TARGET_OFF \
     "RenderColorTarget0=CurrentVertices;" \
     "RenderDepthStencilTarget=AtlasDepth;" \
     "Pass=RecordHistory;"
@@ -236,12 +324,27 @@ technique GeometrySS < string MMDPass = "object_ss"; string Script = MB_RECORD_S
     MB_RECORD_PASSES
 }
 #else
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+technique Geometry <
+    string MMDPass = "object";
+    string Script = MB_CUT_TARGET_ON "Pass=WriteGeometry;" MB_CUT_TARGET_OFF;
+> {
+    pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE }
+}
+technique GeometrySS <
+    string MMDPass = "object_ss";
+    string Script = MB_CUT_TARGET_ON "Pass=WriteGeometry;" MB_CUT_TARGET_OFF;
+> {
+    pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE }
+}
+#else
 technique Geometry < string MMDPass = "object"; > {
     pass WriteGeometry { MB_GEOMETRY_STATE }
 }
 technique GeometrySS < string MMDPass = "object_ss"; > {
     pass WriteGeometry { MB_GEOMETRY_STATE }
 }
+#endif
 #endif
 
 #if MB_EXTEND_FOREGROUND && MB_OUTLINE_MOTION
@@ -261,19 +364,40 @@ OutlineOutput ProjectOutline(float4 position : POSITION)
     return output;
 }
 
-float4 OutlineDepth(OutlineOutput input) : COLOR0
+float4 OutlineSurfaceDepth(OutlineOutput input)
 {
     clip(OutlineColor.a - 0.004);
     float coverage = OutlineColor.a >= 0.985 ? 4.0 : 3.0;
     return float4(0.0, 0.0, log2(max(input.viewDepth, 0.0001)), coverage);
 }
 
-technique OutlineGeometry < string MMDPass = "edge"; > {
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+DepthTargets OutlineDepth(OutlineOutput input)
+{
+    DepthTargets output;
+    output.primary = OutlineSurfaceDepth(input);
+    output.cutMotion = 0.0;
+    return output;
+}
+#else
+float4 OutlineDepth(OutlineOutput input) : COLOR0
+{
+    return OutlineSurfaceDepth(input);
+}
+#endif
+
+technique OutlineGeometry <
+    string MMDPass = "edge";
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+    string Script = MB_CUT_TARGET_ON "Pass=WriteOutline;" MB_CUT_TARGET_OFF;
+#endif
+> {
     pass WriteOutline < string Script = "Draw=Geometry;"; > {
         AlphaBlendEnable = FALSE; AlphaTestEnable = FALSE;
         ZEnable = TRUE; ZWriteEnable = TRUE; ZFunc = LESS;
         CullMode = CW; FillMode = SOLID; StencilEnable = FALSE;
         SRGBWriteEnable = FALSE; ColorWriteEnable = 15;
+        MB_CUT_TARGET_STATE
         VertexShader = compile vs_3_0 ProjectOutline();
         PixelShader = compile ps_3_0 OutlineDepth();
     }

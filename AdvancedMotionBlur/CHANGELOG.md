@@ -9,6 +9,7 @@
 - 控制器的其他栏追加 `Force Cut` 与 `Keep Camera`，可注册关键帧覆盖自动切镜。
 - 可选双层拖尾 `MB_LAYERED_TRAIL`，给快速前景和不同深度的背景各保留一条方向，用于修复近景运动旁背景拖尾突然断成方块。
 - `MB_DEBUG=5` 检查 MME 的模型顶点输入是否还需乘 `WORLD`，供切镜保留角色动作的后续实机验证。
+- 新增默认关闭的 `MB_KEEP_OBJECT_MOTION_ON_CUT`，用世界空间顶点历史在切镜帧分离角色动作和镜头速度。
 
 - 新增速度死区 `MB_SPEED_THRESHOLD`：拖影先减去该长度，慢的部分保持清晰，只模糊快速动作。控制器"其他"栏新增单个表情 `Threshold`（最多再加 16 px）。
 - 默认效果加强：快门角保持 180°，`MB_MOTION_SCALE` 1.0 → 1.3，`MB_MAX_STREAK` 48 → 64 px，`MB_SPEED_THRESHOLD` 3 px。恢复 0.2.0 观感的设置写在参数手册。

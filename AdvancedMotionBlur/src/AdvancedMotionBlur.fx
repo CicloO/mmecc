@@ -1,6 +1,7 @@
 #include "Settings.fxh"
 #include "Fullscreen.fxh"
 #include "Controller.fxh"
+#include "HistoryTargets.fxh"
 
 #define MB_USE_FOREGROUND (MB_EXTEND_FOREGROUND && MB_DEBUG == 0)
 
@@ -23,11 +24,6 @@ float DepthClear = 1.0;
 
 texture SceneColor : RENDERCOLORTARGET < string Format = "A8R8G8B8"; >;
 texture SceneDepth : RENDERDEPTHSTENCILTARGET;
-texture CameraState : RENDERCOLORTARGET <
-    int Width = 8;
-    int Height = 1;
-    string Format = "A32B32G32R32F";
->;
 texture CameraDepth : RENDERDEPTHSTENCILTARGET < int Width = 8; int Height = 1; >;
 texture CameraAnalysis : RENDERCOLORTARGET <
     int Width = 1;
@@ -72,9 +68,13 @@ sampler2D SceneTapSampler = sampler_state {
 #endif
     MipFilter = NONE; AddressU = CLAMP; AddressV = CLAMP; SRGBTexture = FALSE;
 };
-sampler2D CameraSampler = sampler_state { Texture = <CameraState>; MB_POINT_FILTER };
+sampler2D CameraSampler = sampler_state { Texture = <AMB_CameraHistory>; MB_POINT_FILTER };
 sampler2D AnalysisSampler = sampler_state { Texture = <CameraAnalysis>; MB_POINT_FILTER };
 sampler2D GeometrySampler = sampler_state { Texture = <GeometryData>; MB_POINT_FILTER };
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+sampler2D CutMotionSampler = sampler_state { Texture = <AMB_CutMotion>; MB_POINT_FILTER };
+float4 CutMotionClear = {0.0, 0.0, 0.0, 0.0};
+#endif
 
 // Shutter angles refer to a 30 fps frame. Screen velocity is measured per
 // second, so the streak length does not depend on the export frame rate.
@@ -88,19 +88,30 @@ float ExposureScale()
 
 #include "Camera.fxh"
 
-float2 ExposureStreak(float2 uv, float4 geometry, float dt, float exposure)
+float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
 {
+    float dt = CameraBlurInterval(camera);
     if (dt <= 0.0 || geometry.a < 0.5 || geometry.a > 2.5) {
         return 0.0;
     }
-    float2 delta = geometry.a > 1.5 ? geometry.rg : CameraDisplacement(uv, geometry.b);
+    float2 delta;
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+    if (camera.w > 0.5) {
+        float2 sampleUV = uv + 0.5 / ScreenSize;
+        float4 localMotion = tex2Dlod(CutMotionSampler, float4(sampleUV, 0.0, 0.0));
+        delta = localMotion.a > 0.5 && abs(localMotion.b - geometry.b) < 0.002 ? localMotion.rg : 0.0;
+    } else
+#endif
+    {
+        delta = geometry.a > 1.5 ? geometry.rg : CameraDisplacement(uv, geometry.b);
+    }
     float distance = length(delta);
     if (!(distance >= 0.01 && distance < length(ScreenSize) * 0.65)) {
         return 0.0;
     }
     // Dead zone: slow parts lose their whole streak, fast parts lose the same
     // length, so the transition stays continuous (no popping at the edge).
-    float extent = max(0.0, distance * exposure / dt - MotionSpeedThreshold());
+    float extent = max(0.0, distance * camera.y / dt - MotionSpeedThreshold());
     extent = min(MotionStreakLimit(), extent);
     return delta * (extent / distance);
 }
@@ -225,7 +236,7 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     return float4(!transformed, direct, transformed && !direct, 1.0);
 #else
     float4 camera = CurrentCameraAnalysis();
-    float2 streak = ExposureStreak(quadUV, geometry, CameraBlurInterval(camera), camera.y);
+    float2 streak = ExposureStreak(quadUV, geometry, camera);
 #if MB_DEBUG == 2
     float limit = max(MotionStreakLimit(), 1.0);
     return float4(0.5 + 0.5 * clamp(streak / limit, -1.0, 1.0),
@@ -277,7 +288,14 @@ technique AdvancedMotionBlur <
         "RenderColorTarget0=;"
         "RenderDepthStencilTarget=;"
         "Pass=Output;"
-        "RenderColorTarget0=CameraState;"
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+        // Clear for the next auxiliary scene render, after every consumer is done.
+        "RenderColorTarget0=AMB_CutMotion;"
+        "RenderDepthStencilTarget=SceneDepth;"
+        "ClearSetColor=CutMotionClear;"
+        "Clear=Color;"
+#endif
+        "RenderColorTarget0=AMB_CameraHistory;"
         "RenderDepthStencilTarget=CameraDepth;"
         "Pass=SaveCamera;"
         "RenderColorTarget0=;"

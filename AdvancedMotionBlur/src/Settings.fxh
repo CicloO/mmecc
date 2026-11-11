@@ -22,3 +22,4 @@
 #define MB_OUTLINE_MOTION 1       // 0: disable outline coverage and velocity repair
 #define MB_AUTO_MODEL_MOTION 1     // PMD/PMX use vertex history by default
 #define MB_HISTORY_SIZE 512        // Square vertex atlas used by MotionGeometry.fx
+#define MB_KEEP_OBJECT_MOTION_ON_CUT 0 // 1: store world-space history and keep model motion across cuts

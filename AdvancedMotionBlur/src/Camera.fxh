@@ -1,5 +1,3 @@
-static const float CameraHistoryTag = 319.5;
-
 float3 CameraForward()
 {
     return float3(View[0][2], View[1][2], View[2][2]);
@@ -18,7 +16,11 @@ float4 CurrentCameraAnalysis()
 
 float CameraBlurInterval(float4 analysis)
 {
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+    return analysis.x;
+#else
     return analysis.w > 0.5 ? 0.0 : analysis.x;
+#endif
 }
 
 float4 StoreCamera(float2 quadUV : TEXCOORD0) : COLOR0
