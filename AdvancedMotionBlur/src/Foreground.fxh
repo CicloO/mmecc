@@ -24,8 +24,9 @@ float4 BuildMotionField(float2 quadUV : TEXCOORD0) : COLOR0
 {
     float2 uv = quadUV + 0.5 / ScreenSize;
     float4 geometry = tex2Dlod(GeometrySampler, float4(uv, 0.0, 0.0));
-    float dt = CameraInterval();
-    float exposure = ExposureScale();
+    float4 camera = CurrentCameraAnalysis();
+    float dt = CameraBlurInterval(camera);
+    float exposure = camera.y;
     float2 offset = 0.0;
     float coverage = geometry.a;
 #if MB_OUTLINE_MOTION

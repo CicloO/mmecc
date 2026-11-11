@@ -29,6 +29,12 @@ texture CameraState : RENDERCOLORTARGET <
     string Format = "A32B32G32R32F";
 >;
 texture CameraDepth : RENDERDEPTHSTENCILTARGET < int Width = 8; int Height = 1; >;
+texture CameraAnalysis : RENDERCOLORTARGET <
+    int Width = 1;
+    int Height = 1;
+    string Format = "A32B32G32R32F";
+>;
+texture AnalysisDepth : RENDERDEPTHSTENCILTARGET < int Width = 1; int Height = 1; >;
 
 texture GeometryData : OFFSCREENRENDERTARGET <
     string Description = "AdvancedMotionBlur - depth and motion";
@@ -67,72 +73,8 @@ sampler2D SceneTapSampler = sampler_state {
     MipFilter = NONE; AddressU = CLAMP; AddressV = CLAMP; SRGBTexture = FALSE;
 };
 sampler2D CameraSampler = sampler_state { Texture = <CameraState>; MB_POINT_FILTER };
+sampler2D AnalysisSampler = sampler_state { Texture = <CameraAnalysis>; MB_POINT_FILTER };
 sampler2D GeometrySampler = sampler_state { Texture = <GeometryData>; MB_POINT_FILTER };
-
-float3 CameraForward()
-{
-    return float3(View[0][2], View[1][2], View[2][2]);
-}
-
-float3 CameraUp()
-{
-    return float3(View[0][1], View[1][1], View[2][1]);
-}
-
-float4 StoreCamera(float2 quadUV : TEXCOORD0) : COLOR0
-{
-    int slot = (int)(quadUV.x * 8.0 + 0.5);
-    if (slot < 4) {
-        return ViewProjection[slot];
-    }
-    if (slot == 4) {
-        return float4(Timeline, ScreenSize, 319.25);
-    }
-    if (slot == 5) {
-        return float4(CameraForward(), Projection[1][1]);
-    }
-    return float4(CameraUp(), Projection[2][3]);
-}
-
-float4 PreviousCamera(float slot)
-{
-    return tex2Dlod(CameraSampler, float4((slot + 0.5) / 8.0, 0.5, 0.0, 0.0));
-}
-
-float CameraInterval()
-{
-    float4 timing = PreviousCamera(4.0);
-    float dt = Timeline - timing.x;
-    if (timing.w != 319.25 || any(abs(timing.yz - ScreenSize) > 0.5)
-        || !(dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP)) {
-        return 0.0;
-    }
-    float4 previousForward = PreviousCamera(5.0);
-    float4 previousUp = PreviousCamera(6.0);
-    float zoomRatio = Projection[1][1] / max(previousForward.w, 0.0001);
-    if (dot(previousForward.xyz, CameraForward()) < MB_CUT_ANGLE_COS
-        || dot(previousUp.xyz, CameraUp()) < MB_CUT_ANGLE_COS
-        || zoomRatio < 0.75 || zoomRatio > 1.33
-        || abs(previousUp.w - Projection[2][3]) > 0.5) {
-        return 0.0;
-    }
-    return dt;
-}
-
-float2 CameraDisplacement(float2 uv, float logDepth)
-{
-    float depth = exp2(logDepth);
-    float4 projectionZW = mul(float4(0.0, 0.0, depth, 1.0), Projection);
-    float2 ndc = (uv * 2.0 - 1.0) * float2(1.0, -1.0);
-    float4 currentClip = float4(ndc * projectionZW.w, projectionZW.zw);
-    float4 world = mul(currentClip, InverseViewProjection);
-    float4 oldClip = mul(world, float4x4(
-        PreviousCamera(0.0), PreviousCamera(1.0), PreviousCamera(2.0), PreviousCamera(3.0)));
-    if (oldClip.w < 0.0001) {
-        return 0.0;
-    }
-    return (ndc - oldClip.xy / oldClip.w) * float2(0.5, -0.5) * ScreenSize;
-}
 
 // Shutter angles refer to a 30 fps frame. Screen velocity is measured per
 // second, so the streak length does not depend on the export frame rate.
@@ -143,6 +85,8 @@ float ExposureScale()
     float strength = max(0.0, AccessoryScale * 0.1 * MotionStrength());
     return MotionShutter() * strength / ShutterReferenceFps;
 }
+
+#include "Camera.fxh"
 
 float2 ExposureStreak(float2 uv, float4 geometry, float dt, float exposure)
 {
@@ -273,7 +217,8 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     return float4(geometry.a > 2.5, geometry.a > 1.5 && geometry.a < 2.5,
                   geometry.a > 0.5 && geometry.a < 1.5, 1.0);
 #else
-    float2 streak = ExposureStreak(quadUV, geometry, CameraInterval(), ExposureScale());
+    float4 camera = CurrentCameraAnalysis();
+    float2 streak = ExposureStreak(quadUV, geometry, CameraBlurInterval(camera), camera.y);
 #if MB_DEBUG == 2
     float limit = max(MotionStreakLimit(), 1.0);
     return float4(0.5 + 0.5 * clamp(streak / limit, -1.0, 1.0),
@@ -300,8 +245,12 @@ technique AdvancedMotionBlur <
         "Clear=Color;"
         "Clear=Depth;"
         "ScriptExternal=Color;"
+        "RenderColorTarget0=CameraAnalysis;"
+        "RenderDepthStencilTarget=AnalysisDepth;"
+        "Pass=AnalyzeCamera;"
 #if MB_USE_FOREGROUND
         "RenderColorTarget0=MotionField;"
+        "RenderDepthStencilTarget=SceneDepth;"
         "Pass=BuildMotion;"
         "RenderColorTarget0=TileMax;"
         "RenderDepthStencilTarget=TileDepth;"
@@ -318,6 +267,10 @@ technique AdvancedMotionBlur <
         "RenderColorTarget0=;"
         "RenderDepthStencilTarget=;";
 > {
+    pass AnalyzeCamera < string Script = "Draw=Buffer;"; > {
+        MB_SCREEN_STATE
+        PixelShader = compile ps_3_0 AnalyzeCameraFrame();
+    }
 #if MB_USE_FOREGROUND
     pass BuildMotion < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
