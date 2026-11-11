@@ -54,9 +54,9 @@ float4 BuildMotionField(float2 quadUV : TEXCOORD0) : COLOR0
 
 // A tile covers about 32 px and can reach 63 px if the ratio rounds down to one tile.
 #define MaxTileSpan 63
-// The neighbour search reaches half the largest streak
-// (MB_MAX_STREAK with Streak + at 1) plus 1 px, in tiles of at least 24 px.
-#define MaxNeighborSpan (2 * (int)ceil((max(MB_MAX_STREAK, 0.0) + 1.0) / 24.0) + 1)
+// ps_3_0 loops can run at most 255 iterations. Split long rows and columns
+// so the search covers the entire rectangle even with a large streak limit.
+static const int MaxLoopIterations = 255;
 
 float2 TileRasterSize(float2 quadUV)
 {
@@ -163,10 +163,10 @@ float4 BuildTileAlternate(float2 quadUV : TEXCOORD0) : COLOR0
     float2 first = floor(tile * tileSpan + 0.5);
     float2 count = min(ScreenSize, floor((tile + 1.0) * tileSpan + 0.5)) - first;
     float4 best = 0.0;
-    [loop]
+    [fastopt]
     for (int j = 0; j < MaxTileSpan; ++j) {
         if (j >= count.y) break;
-        [loop]
+        [fastopt]
         for (int i = 0; i < MaxTileSpan; ++i) {
             if (i >= count.x) break;
             float2 uv = (first + float2(i, j) + 0.5) / ScreenSize;
@@ -197,6 +197,29 @@ void AccumulateNeighbor(inout TileReduction best, float4 sampleMotion, float2 ga
     }
 }
 
+void ReduceNeighborRow(inout TileReduction best, float2 tile, float2 tileSpan, float2 rasterSize,
+                       float2 rowStart, int width, bool alternate, float primaryDepth)
+{
+    // fastopt prevents d3dx9_43 from simulating the runtime loop bounds.
+    [fastopt]
+    for (int block = 0; block < width; block += MaxLoopIterations) {
+        int end = min(block + MaxLoopIterations, width);
+        [fastopt]
+        for (int i = block; i < end; ++i) {
+            float2 sourceTile = rowStart + float2(i, 0.0);
+            float2 uv = (sourceTile + 0.5) / rasterSize;
+            float2 gap = max(0.0, (abs(sourceTile - tile) - 1.0) * tileSpan - 1.0);
+            AccumulateNeighbor(best, tex2Dlod(TileSampler, float4(uv, 0.0, 0.0)), gap, alternate, primaryDepth);
+#if MB_LAYERED_TRAIL
+            // The tile maximum already bounds reach and nearest depth for both candidates.
+            if (alternate) {
+                AccumulateNeighbor(best, tex2Dlod(TileAlternateSampler, float4(uv, 0.0, 0.0)), gap, alternate, primaryDepth);
+            }
+#endif
+        }
+    }
+}
+
 float4 ReduceNeighbors(float2 quadUV, bool alternate)
 {
     float2 rasterSize = TileRasterSize(quadUV);
@@ -220,23 +243,14 @@ float4 ReduceNeighbors(float2 quadUV, bool alternate)
     float2 tileSpan = ScreenSize / rasterSize;
     float2 radius = ceil((0.5 * MotionStreakLimit() + 1.0) / tileSpan);
     float2 first = max(0.0, tile - radius);
-    float2 count = min(rasterSize - 1.0, tile + radius) - first + 1.0;
-    [loop]
-    for (int j = 0; j < MaxNeighborSpan; ++j) {
-        if (j >= count.y) break;
-        [loop]
-        for (int i = 0; i < MaxNeighborSpan; ++i) {
-            if (i >= count.x) break;
-            float2 sourceTile = first + float2(i, j);
-            float2 uv = (sourceTile + 0.5) / rasterSize;
-            float2 gap = max(0.0, (abs(sourceTile - tile) - 1.0) * tileSpan - 1.0);
-            AccumulateNeighbor(best, tex2Dlod(TileSampler, float4(uv, 0.0, 0.0)), gap, alternate, primaryDepth);
-#if MB_LAYERED_TRAIL
-            // The tile maximum already bounds reach and nearest depth for both candidates.
-            if (alternate) {
-                AccumulateNeighbor(best, tex2Dlod(TileAlternateSampler, float4(uv, 0.0, 0.0)), gap, alternate, primaryDepth);
-            }
-#endif
+    int2 count = (int2)(min(rasterSize - 1.0, tile + radius) - first + 1.0);
+    [fastopt]
+    for (int block = 0; block < count.y; block += MaxLoopIterations) {
+        int end = min(block + MaxLoopIterations, count.y);
+        [fastopt]
+        for (int j = block; j < end; ++j) {
+            ReduceNeighborRow(best, tile, tileSpan, rasterSize, first + float2(0.0, j),
+                              count.x, alternate, primaryDepth);
         }
     }
 #if MB_LAYERED_TRAIL
