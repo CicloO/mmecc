@@ -1,5 +1,9 @@
 texture MotionField : RENDERCOLORTARGET < string Format = "A16B16G16R16F"; >;
 
+#ifndef MB_TRAIL_SPREAD
+#define MB_TRAIL_SPREAD 0.35
+#endif
+
 // Nominally 32 output pixels per tile. Use the actual raster size in the passes
 // so odd viewport dimensions and MME's ratio rounding still cover all pixels.
 #define MB_TILE_RATIO float2 ViewPortRatio = {0.03125, 0.03125};
@@ -34,6 +38,12 @@ float4 BuildMotionField(float2 quadUV : TEXCOORD0) : COLOR0
     return float4(streak, geometry.b, coverage);
 }
 
+// Upper bounds for the reduction loops. A tile covers about 32 px; allow for
+// MME's ratio rounding. The neighbour search reaches half the largest streak
+// (MB_MAX_STREAK with Streak + at 1) plus 1 px, in tiles of at least 24 px.
+#define MaxTileSpan 40
+#define MaxNeighborSpan (2 * (int)ceil((max(MB_MAX_STREAK, 0.0) + 1.0) / 24.0) + 1)
+
 float2 TileRasterSize(float2 quadUV)
 {
     return floor(rcp(float2(ddx(quadUV.x), ddy(quadUV.y))) + 0.5);
@@ -58,13 +68,17 @@ float4 BuildTileMax(float2 quadUV : TEXCOORD0) : COLOR0
     float4 best = float4(0.0, 0.0, 128.0, 0.0);
     float2 tile = floor(quadUV * rasterSize + 0.5);
     float2 tileSpan = ScreenSize / rasterSize;
-    int2 first = (int2)floor(tile * tileSpan + 0.5);
-    int2 end = min((int2)ScreenSize, (int2)floor((tile + 1.0) * tileSpan + 0.5));
+    float2 first = floor(tile * tileSpan + 0.5);
+    float2 count = min(ScreenSize, floor((tile + 1.0) * tileSpan + 0.5)) - first;
+    // Constant trip counts: d3dx9_43 (MME's compiler) otherwise simulates a
+    // runtime-bounded loop for seconds while optimising.
     [loop]
-    for (int y = first.y; y < end.y; ++y) {
+    for (int j = 0; j < MaxTileSpan; ++j) {
+        if (j >= count.y) break;
         [loop]
-        for (int x = first.x; x < end.x; ++x) {
-            float2 uv = (float2(x, y) + 0.5) / ScreenSize;
+        for (int i = 0; i < MaxTileSpan; ++i) {
+            if (i >= count.x) break;
+            float2 uv = (first + float2(i, j) + 0.5) / ScreenSize;
             float3 sampleMotion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0)).rgb;
             AccumulateTile(best, sampleMotion, dot(sampleMotion.rg, sampleMotion.rg));
         }
@@ -79,13 +93,15 @@ float4 BuildNeighborMax(float2 quadUV : TEXCOORD0) : COLOR0
     float2 tile = floor(quadUV * rasterSize + 0.5);
     float2 tileSpan = ScreenSize / rasterSize;
     float2 radius = ceil((0.5 * MotionStreakLimit() + 1.0) / tileSpan);
-    int2 first = (int2)max(0.0, tile - radius);
-    int2 last = (int2)min(rasterSize - 1.0, tile + radius);
+    float2 first = max(0.0, tile - radius);
+    float2 count = min(rasterSize - 1.0, tile + radius) - first + 1.0;
     [loop]
-    for (int y = first.y; y <= last.y; ++y) {
+    for (int j = 0; j < MaxNeighborSpan; ++j) {
+        if (j >= count.y) break;
         [loop]
-        for (int x = first.x; x <= last.x; ++x) {
-            float2 sourceTile = float2(x, y);
+        for (int i = 0; i < MaxNeighborSpan; ++i) {
+            if (i >= count.x) break;
+            float2 sourceTile = first + float2(i, j);
             float2 uv = (sourceTile + 0.5) / rasterSize;
             float3 sampleMotion = tex2Dlod(TileSampler, float4(uv, 0.0, 0.0)).rgb;
             float lengthSquared = dot(sampleMotion.rg, sampleMotion.rg);
@@ -139,7 +155,11 @@ float3 ExtendForeground(float2 uv, float3 background, float4 center)
         float across = abs(dot(delta, float2(-axis.y, axis.x)));
         float halfLength = 0.5 * sourceLength;
         float support = 1.0 - smoothstep(max(0.0, halfLength - 0.75), halfLength + 0.75, along);
-        support *= 1.0 - smoothstep(0.5, 1.25, across);
+        // The ray follows the tile's dominant direction, which differs a little
+        // from each source's own. A fixed ~1 px width only lets aligned pixels
+        // through and breaks thin outlines into dots, so widen it with distance.
+        float spread = MB_TRAIL_SPREAD * along;
+        support *= 1.0 - smoothstep(0.5 + spread, 1.25 + spread, across);
         if (hasDepth) {
             support *= smoothstep(DepthTolerance, 2.0 * DepthTolerance, center.b - source.b);
         }

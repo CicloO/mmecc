@@ -5,13 +5,14 @@ from struct import pack
 
 
 MORPHS = (
-    # MMD panels: 1 eyebrow, 2 eye, 3 mouth.
+    # MMD panels: 1 eyebrow, 2 eye, 3 mouth, 4 other.
     ("Strength +", 1),
     ("Strength -", 1),
     ("Shutter +", 2),
     ("Shutter -", 2),
     ("Streak +", 3),
     ("Streak -", 3),
+    ("Threshold", 4),
 )
 
 

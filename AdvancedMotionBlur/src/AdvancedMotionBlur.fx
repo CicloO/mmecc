@@ -50,6 +50,22 @@ texture GeometryData : OFFSCREENRENDERTARGET <
     MinFilter = POINT; MagFilter = POINT; MipFilter = NONE; \
     AddressU = CLAMP; AddressV = CLAMP; SRGBTexture = FALSE;
 sampler2D SceneSampler = sampler_state { Texture = <SceneColor>; MB_POINT_FILTER };
+
+#ifndef MB_LINEAR_COLOR
+#define MB_LINEAR_COLOR 1
+#endif
+// Trail taps land between pixels. Filtering their colour lets a thin, slanted
+// outline fade evenly instead of flipping between line and background.
+// Geometry stays point-sampled so depth and coverage tests are not blended.
+sampler2D SceneTapSampler = sampler_state {
+    Texture = <SceneColor>;
+#if MB_LINEAR_COLOR
+    MinFilter = LINEAR; MagFilter = LINEAR;
+#else
+    MinFilter = POINT; MagFilter = POINT;
+#endif
+    MipFilter = NONE; AddressU = CLAMP; AddressV = CLAMP; SRGBTexture = FALSE;
+};
 sampler2D CameraSampler = sampler_state { Texture = <CameraState>; MB_POINT_FILTER };
 sampler2D GeometrySampler = sampler_state { Texture = <GeometryData>; MB_POINT_FILTER };
 
@@ -138,7 +154,10 @@ float2 ExposureStreak(float2 uv, float4 geometry, float dt, float exposure)
     if (!(distance >= 0.01 && distance < length(ScreenSize) * 0.65)) {
         return 0.0;
     }
-    float extent = min(MotionStreakLimit(), distance * exposure / dt);
+    // Dead zone: slow parts lose their whole streak, fast parts lose the same
+    // length, so the transition stays continuous (no popping at the edge).
+    float extent = max(0.0, distance * exposure / dt - MotionSpeedThreshold());
+    extent = min(MotionStreakLimit(), extent);
     return delta * (extent / distance);
 }
 
@@ -149,36 +168,70 @@ static const float DepthTolerance = max(MB_DEPTH_TOLERANCE, 0.0001);
 #include "Foreground.fxh"
 #endif
 
-float DepthWeight(float4 center, float4 sampleGeometry)
+#ifndef MB_EDGE_BACKGROUND
+#define MB_EDGE_BACKGROUND 1
+#endif
+
+// Weight of one trail tap. Same-layer taps average the surface. With
+// MB_EDGE_BACKGROUND, taps on empty space or on anything farther count as the
+// background that shows through while the surface moves across this pixel, so
+// the inner side of a silhouette fades like the outer side. Nearer taps are
+// left to ExtendForeground; translucent taps stay excluded.
+float TapWeight(float4 center, float4 sampleGeometry, float sampleAlpha)
 {
-    if (sampleGeometry.a < 0.5 || (sampleGeometry.a > 2.5 && sampleGeometry.a < 3.5)) {
+    if (sampleGeometry.a > 2.5 && sampleGeometry.a < 3.5) {
         return 0.0;
     }
-    float gap = abs(center.b - sampleGeometry.b);
-    return 1.0 - smoothstep(DepthTolerance, DepthTolerance * 2.0, gap);
+    if (sampleGeometry.a < 0.5) {
+        return MB_EDGE_BACKGROUND ? 1.0 : 0.0;
+    }
+    float gap = sampleGeometry.b - center.b;
+    float same = 1.0 - smoothstep(DepthTolerance, DepthTolerance * 2.0, abs(gap));
+    float weight = same * sampleAlpha;
+#if MB_EDGE_BACKGROUND
+    weight += smoothstep(DepthTolerance, DepthTolerance * 2.0, gap);
+#endif
+    return weight;
 }
 
+// Tap count follows the streak length, so long streaks keep a fixed spacing
+// instead of breaking into visible copies, and short ones cost less.
 #if MB_QUALITY == 0
-#define MB_TAPS 8
+static const float TapSpacing = 4.0;
+static const float MinTaps = 4.0;
+static const float MaxTaps = 32.0;
 #elif MB_QUALITY == 2
-#define MB_TAPS 24
+static const float TapSpacing = 1.0;
+static const float MinTaps = 4.0;
+static const float MaxTaps = 128.0;
+#elif MB_QUALITY == 3
+// 0.2.0 kernel: always 16 taps spread over the streak, for side-by-side tests.
+static const float TapSpacing = 1.0;
+static const float MinTaps = 16.0;
+static const float MaxTaps = 16.0;
 #else
-#define MB_TAPS 16
+static const float TapSpacing = 2.0;
+static const float MinTaps = 4.0;
+static const float MaxTaps = 64.0;
 #endif
 
 float3 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 {
     bool outline = geometry.a > 3.5;
-    if (dot(streak, streak) < MinStreak * MinStreak || (color.a <= 0.004 && !outline)) {
+    float streakLength = length(streak);
+    if (streakLength < MinStreak || (color.a <= 0.004 && !outline)) {
         return color.rgb;
     }
 
-    float weightSum = outline ? 0.75 : 2.0;
+    int taps = (int)clamp(ceil(streakLength / TapSpacing), MinTaps, MaxTaps);
+    // Keep the centre's share of the total the same as the old 16-tap kernel
+    // (2/16 for surfaces, 0.75/16 for outlines).
+    float weightSum = taps * (outline ? 0.046875 : 0.125);
     float3 sum = color.rgb * weightSum;
     float2 stepUV = streak / ScreenSize;
     [loop]
-    for (int tap = 0; tap < MB_TAPS; ++tap) {
-        float t = (tap + 0.5) / MB_TAPS - 0.5;
+    for (int tap = 0; tap < taps; ++tap) {
+        float t = (tap + 0.5) / taps - 0.5;
         float2 tapUV = uv + t * stepUV;
         float inside = all(tapUV >= 0.0) && all(tapUV < 1.0);
         // Both buffers carry the same log depth and coverage in B/A.
@@ -187,9 +240,9 @@ float3 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 #else
         float4 tapGeometry = tex2Dlod(GeometrySampler, float4(tapUV, 0.0, 0.0));
 #endif
-        float4 tapColor = tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0));
+        float4 tapColor = tex2Dlod(SceneTapSampler, float4(tapUV, 0.0, 0.0));
         float alpha = tapGeometry.a > 3.5 ? 1.0 : tapColor.a;
-        float weight = inside * DepthWeight(geometry, tapGeometry) * alpha;
+        float weight = inside * TapWeight(geometry, tapGeometry, alpha);
         sum += tapColor.rgb * weight;
         weightSum += weight;
     }

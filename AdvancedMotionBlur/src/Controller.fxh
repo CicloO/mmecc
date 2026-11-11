@@ -11,6 +11,7 @@ MB_MORPH_WEIGHT(ControlShutterUp, "Shutter +")
 MB_MORPH_WEIGHT(ControlShutterDown, "Shutter -")
 MB_MORPH_WEIGHT(ControlStreakUp, "Streak +")
 MB_MORPH_WEIGHT(ControlStreakDown, "Streak -")
+MB_MORPH_WEIGHT(ControlThreshold, "Threshold")
 
 #undef MB_MORPH_WEIGHT
 
@@ -29,6 +30,15 @@ float MotionStreakLimit()
 {
     return max(MB_MAX_STREAK, 0.0) *
         (1.0 + ControllerWeight(ControlStreakUp) - ControllerWeight(ControlStreakDown));
+}
+
+// Threshold adds up to 16 px on top of the setting.
+static const float ThresholdMorphRange = 16.0;
+
+float MotionSpeedThreshold()
+{
+    return max(MB_SPEED_THRESHOLD, 0.0)
+        + ThresholdMorphRange * ControllerWeight(ControlThreshold);
 }
 
 float MotionShutter()
