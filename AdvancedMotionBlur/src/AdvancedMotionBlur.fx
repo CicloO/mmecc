@@ -270,24 +270,21 @@ technique AdvancedMotionBlur <
         "RenderColorTarget0=MotionField;"
         "RenderDepthStencilTarget=SceneDepth;"
         "Pass=BuildMotion;"
-#if !MB_LAYERED_TRAIL
         "RenderColorTarget0=TileRows;"
         "RenderDepthStencilTarget=TileRowsDepth;"
         "Pass=ReduceTileRows;"
-#endif
         "RenderColorTarget0=TileMax;"
         "RenderDepthStencilTarget=TileDepth;"
-#if MB_LAYERED_TRAIL
-        "RenderColorTarget1=TileAlternate;"
-#endif
         "Pass=ReduceTiles;"
-        "RenderColorTarget0=NeighborMax;"
 #if MB_LAYERED_TRAIL
-        "RenderColorTarget1=NeighborAlternate;"
+        "RenderColorTarget0=TileAlternate;"
+        "Pass=ReduceTileAlternate;"
 #endif
+        "RenderColorTarget0=NeighborMax;"
         "Pass=ReduceNeighbors;"
 #if MB_LAYERED_TRAIL
-        "RenderColorTarget1=;"
+        "RenderColorTarget0=NeighborAlternate;"
+        "Pass=ReduceNeighborAlternate;"
 #endif
 #endif
         "RenderColorTarget0=;"
@@ -315,26 +312,30 @@ technique AdvancedMotionBlur <
         MB_SCREEN_STATE
         PixelShader = compile ps_3_0 BuildMotionField();
     }
-#if !MB_LAYERED_TRAIL
     pass ReduceTileRows < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
         PixelShader = compile ps_3_0 BuildTileRows();
     }
-#endif
     pass ReduceTiles < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
-#if MB_LAYERED_TRAIL
-        ColorWriteEnable1 = 15;
-#endif
         PixelShader = compile ps_3_0 BuildTileMax();
     }
+#if MB_LAYERED_TRAIL
+    pass ReduceTileAlternate < string Script = "Draw=Buffer;"; > {
+        MB_SCREEN_STATE
+        PixelShader = compile ps_3_0 BuildTileAlternate();
+    }
+#endif
     pass ReduceNeighbors < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
-#if MB_LAYERED_TRAIL
-        ColorWriteEnable1 = 15;
-#endif
         PixelShader = compile ps_3_0 BuildNeighborMax();
     }
+#if MB_LAYERED_TRAIL
+    pass ReduceNeighborAlternate < string Script = "Draw=Buffer;"; > {
+        MB_SCREEN_STATE
+        PixelShader = compile ps_3_0 BuildNeighborAlternate();
+    }
+#endif
 #endif
     pass Output < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
