@@ -1,4 +1,4 @@
-# Compile the three effects with FXC (fx_2_0) across the Settings.fxh switch
+# Compile the effects with FXC (fx_2_0) across the Settings.fxh switch
 # combinations. Every case starts from src/Settings.fxh with MB_DEBUG forced to
 # 0, so a debug view left on locally does not hide the full shader.
 #
@@ -23,6 +23,9 @@ $cases = @(
     @{ Name = 'alphalayered'; Set = @{ MB_TRAIL_ALPHA = '1'; MB_LAYERED_TRAIL = '1' } },
     @{ Name = 'alphadebug1'; Set = @{ MB_TRAIL_ALPHA = '1'; MB_DEBUG = '1' } },
     @{ Name = 'alphaworld'; Set = @{ MB_TRAIL_ALPHA = '1'; MB_KEEP_OBJECT_MOTION_ON_CUT = '1' } },
+    @{ Name = 'rigid'; Set = @{ MB_ACCESSORY_MOTION = '1' } },
+    @{ Name = 'rigidworld'; Set = @{ MB_ACCESSORY_MOTION = '1'; MB_KEEP_OBJECT_MOTION_ON_CUT = '1' } },
+    @{ Name = 'rigiddebug5'; Set = @{ MB_ACCESSORY_MOTION = '1'; MB_DEBUG = '5' } },
     @{ Name = 'q0'; Set = @{ MB_QUALITY = '0' } },
     @{ Name = 'q2'; Set = @{ MB_QUALITY = '2' } },
     @{ Name = 'q3'; Set = @{ MB_QUALITY = '3' } },
@@ -55,6 +58,7 @@ $cases = @(
     @{ Name = 'thresh8p0'; Set = @{ MB_SPEED_THRESHOLD = '8.0'; MB_EXTEND_FOREGROUND = '0' } },
     @{ Name = 'legacy020'; Set = @{ MB_SHUTTER_ANGLE = '180.0'; MB_MOTION_SCALE = '1.0'; MB_MAX_STREAK = '48.0'; MB_SPEED_THRESHOLD = '0.0'; MB_SCALE_STREAK_WITH_HEIGHT = '0' } }
 )
+$effects = @('AdvancedMotionBlur.fx', 'DepthVelocity.fx', 'MotionGeometry.fx', 'RigidMotion.fx')
 $fail = 0
 foreach ($case in $cases) {
     $dir = Join-Path $Work $case.Name
@@ -67,7 +71,7 @@ foreach ($case in $cases) {
     Set-Content (Join-Path $dir 'Settings.fxh') $text -NoNewline
     $geo = Join-Path $dir 'Geometry.fxh'
     (Get-Content $geo -Raw).Replace(': _INDEX', ': TEXCOORD7') | Set-Content $geo -NoNewline
-    foreach ($fx in 'AdvancedMotionBlur.fx', 'DepthVelocity.fx', 'MotionGeometry.fx') {
+    foreach ($fx in $effects) {
         $out = & $fxc /nologo /T fx_2_0 /Fo (Join-Path $dir ($fx + '.fxo')) (Join-Path $dir $fx) 2>&1
         $ok = $LASTEXITCODE -eq 0
         if (-not $ok) { $fail++ }
@@ -75,5 +79,5 @@ foreach ($case in $cases) {
         '{0,-10} {1,-22} {2} {3}' -f $case.Name, $fx, ($(if ($ok) { 'OK' } else { 'FAIL' })), $issues
     }
 }
-"cases: $($cases.Count), builds: $($cases.Count * 3), failures: $fail"
+"cases: $($cases.Count), builds: $($cases.Count * $effects.Count), failures: $fail"
 exit $fail

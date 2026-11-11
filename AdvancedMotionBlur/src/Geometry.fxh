@@ -1,7 +1,15 @@
 #include "Settings.fxh"
 
-#if MB_KEEP_OBJECT_MOTION_ON_CUT
+#ifndef MB_RIGID_HISTORY
+#define MB_RIGID_HISTORY 0
+#endif
+#define MB_GEOMETRY_HISTORY (MB_VERTEX_HISTORY || MB_RIGID_HISTORY)
+
+#if MB_KEEP_OBJECT_MOTION_ON_CUT || MB_RIGID_HISTORY
 #include "HistoryTargets.fxh"
+#endif
+
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
 #define MB_CUT_TARGET_ON "RenderColorTarget0=;RenderDepthStencilTarget=;RenderColorTarget1=AMB_CutMotion;"
 #define MB_CUT_TARGET_OFF "RenderColorTarget1=;"
 #define MB_CUT_TARGET_STATE ColorWriteEnable1 = 15;
@@ -27,11 +35,17 @@ sampler2D MaterialSampler = sampler_state {
     AddressV = WRAP;
 };
 
-#if MB_VERTEX_HISTORY
+#if MB_GEOMETRY_HISTORY
 #include "Fullscreen.fxh"
 
 float2 TargetSize : VIEWPORTPIXELSIZE;
 float Timeline : TIME < bool SyncInEditMode = true; >;
+#define MB_HISTORY_FILTER \
+    MinFilter = POINT; MagFilter = POINT; MipFilter = NONE; \
+    AddressU = CLAMP; AddressV = CLAMP; SRGBTexture = FALSE;
+#endif
+
+#if MB_VERTEX_HISTORY
 int VertexCount;
 
 texture CurrentVertices : RENDERCOLORTARGET <
@@ -49,25 +63,8 @@ texture AtlasDepth : RENDERDEPTHSTENCILTARGET <
     int Height = MB_HISTORY_SIZE;
 >;
 
-#define MB_ATLAS_FILTER \
-    MinFilter = POINT; MagFilter = POINT; MipFilter = NONE; \
-    AddressU = CLAMP; AddressV = CLAMP; SRGBTexture = FALSE;
-sampler2D CurrentSampler = sampler_state { Texture = <CurrentVertices>; MB_ATLAS_FILTER };
-sampler2D PreviousSampler = sampler_state { Texture = <PreviousVertices>; MB_ATLAS_FILTER };
-
-#if MB_KEEP_OBJECT_MOTION_ON_CUT
-sampler2D HistoryCameraSampler = sampler_state { Texture = <AMB_CameraHistory>; MB_ATLAS_FILTER };
-
-float4 HistoryCameraSlot(float index)
-{
-    return tex2Dlod(HistoryCameraSampler, float4((index + 0.5) / 8.0, 0.5, 0.0, 0.0));
-}
-
-float4x4 HistoryViewProjection()
-{
-    return float4x4(HistoryCameraSlot(0.0), HistoryCameraSlot(1.0), HistoryCameraSlot(2.0), HistoryCameraSlot(3.0));
-}
-#endif
+sampler2D CurrentSampler = sampler_state { Texture = <CurrentVertices>; MB_HISTORY_FILTER };
+sampler2D PreviousSampler = sampler_state { Texture = <PreviousVertices>; MB_HISTORY_FILTER };
 
 float2 AtlasCell(int index)
 {
@@ -82,12 +79,42 @@ bool FitsAtlas(int index)
 }
 #endif
 
-#if MB_VERTEX_HISTORY && (MB_DEBUG == 5 || MB_KEEP_OBJECT_MOTION_ON_CUT)
+#if MB_RIGID_HISTORY || (MB_VERTEX_HISTORY && (MB_DEBUG == 5 || MB_KEEP_OBJECT_MOTION_ON_CUT))
 float4x4 ObjectToWorld : WORLD;
 float4x4 WorldToClip : VIEWPROJECTION;
 #endif
 
-#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
+#if MB_RIGID_HISTORY || (MB_VERTEX_HISTORY && MB_KEEP_OBJECT_MOTION_ON_CUT)
+sampler2D HistoryCameraSampler = sampler_state { Texture = <AMB_CameraHistory>; MB_HISTORY_FILTER };
+
+float4 HistoryCameraSlot(float index)
+{
+    return tex2Dlod(HistoryCameraSampler, float4((index + 0.5) / 8.0, 0.5, 0.0, 0.0));
+}
+
+float4x4 HistoryViewProjection()
+{
+    return float4x4(HistoryCameraSlot(0.0), HistoryCameraSlot(1.0), HistoryCameraSlot(2.0), HistoryCameraSlot(3.0));
+}
+
+bool HistoryTeleported(float3 shift)
+{
+    return MB_TELEPORT_DISTANCE > 0.0
+        && dot(shift, shift) > MB_TELEPORT_DISTANCE * MB_TELEPORT_DISTANCE;
+}
+
+float4 ReprojectHistory(float4 world, float4x4 camera)
+{
+    float4 clipPosition = mul(world, camera);
+    return clipPosition.w > 0.0001 ? float4(clipPosition.xyw, 1.0) : 0.0;
+}
+#endif
+
+#if MB_RIGID_HISTORY
+#include "RigidHistory.fxh"
+#endif
+
+#if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
 float ProjectionError(float4 expected, float4 projected)
 {
     if (expected.w <= 0.0001 || projected.w <= 0.0001) {
@@ -102,14 +129,14 @@ struct GeometryOutput {
     float4 position : POSITION;
     float2 uv : TEXCOORD0;
     float viewDepth : TEXCOORD1;
-#if MB_VERTEX_HISTORY
+#if MB_GEOMETRY_HISTORY
     float4 previousClip : TEXCOORD2;
     float3 currentClip : TEXCOORD3;
 #endif
-#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
+#if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
     float2 projectionError : TEXCOORD4;
 #endif
-#if MB_KEEP_OBJECT_MOTION_ON_CUT && MB_VERTEX_HISTORY
+#if MB_KEEP_OBJECT_MOTION_ON_CUT && MB_GEOMETRY_HISTORY
     float4 previousLocalClip : TEXCOORD5;
 #endif
 };
@@ -124,7 +151,7 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
     output.position = mul(position, ObjectToClip);
     output.uv = uv;
     output.viewDepth = mul(position, ObjectToView).z;
-#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
+#if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
     output.projectionError = float2(
         ProjectionError(output.position, mul(position, WorldToClip)),
         ProjectionError(output.position, mul(mul(position, ObjectToWorld), WorldToClip)));
@@ -142,16 +169,12 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
         && dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP
         && cameraTiming.w == CameraHistoryTag && abs(cameraTiming.x - previousTime) <= MB_MIN_FRAME_GAP;
     float3 shift = mul(position, ObjectToWorld).xyz - stored.xyz;
-    bool teleported = MB_TELEPORT_DISTANCE > 0.0
-        && dot(shift, shift) > MB_TELEPORT_DISTANCE * MB_TELEPORT_DISTANCE;
     output.previousClip = 0.0;
     output.previousLocalClip = 0.0;
-    if (valid && !teleported) {
+    if (valid && !HistoryTeleported(shift)) {
         float4 world = float4(stored.xyz, 1.0);
-        float4 oldClip = mul(world, HistoryViewProjection());
-        float4 localClip = mul(world, WorldToClip);
-        output.previousClip = oldClip.w > 0.0001 ? float4(oldClip.xyw, 1.0) : 0.0;
-        output.previousLocalClip = localClip.w > 0.0001 ? float4(localClip.xyw, 1.0) : 0.0;
+        output.previousClip = ReprojectHistory(world, HistoryViewProjection());
+        output.previousLocalClip = ReprojectHistory(world, WorldToClip);
     }
 #else
     float dt = Timeline - (stored.w - 1.0);
@@ -159,6 +182,20 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
         && dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP;
     output.previousClip = valid ? float4(stored.xyz, 1.0) : 0.0;
 #endif
+#elif MB_RIGID_HISTORY
+    float4 previousWorld = RigidPreviousWorld(position);
+    output.previousClip = 0.0;
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+    output.previousLocalClip = 0.0;
+#endif
+    if (previousWorld.w > 0.5) {
+        output.previousClip = ReprojectHistory(previousWorld, HistoryViewProjection());
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+        output.previousLocalClip = ReprojectHistory(previousWorld, WorldToClip);
+#endif
+    }
+#endif
+#if MB_GEOMETRY_HISTORY
     output.currentClip = output.position.xyw;
 #endif
     return output;
@@ -173,7 +210,7 @@ float MaterialCoverage(float2 uv)
     return alpha;
 }
 
-#if MB_VERTEX_HISTORY
+#if MB_GEOMETRY_HISTORY
 float2 GeometryMotion(float3 currentClip, float3 previousClip)
 {
     float2 now = currentClip.xy / currentClip.z;
@@ -187,11 +224,11 @@ float4 SurfaceDepth(GeometryOutput input)
     float alpha = MaterialCoverage(input.uv);
     clip(alpha - 0.004);
     float depth = log2(max(input.viewDepth, 0.0001));
-#if MB_DEBUG == 5 && MB_VERTEX_HISTORY
+#if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
     return float4(input.projectionError, depth, 5.0);
 #else
     float coverage = (alpha >= 0.985 && !opadd) ? 1.0 : 3.0;
-#if MB_VERTEX_HISTORY
+#if MB_GEOMETRY_HISTORY
     if (coverage == 1.0 && input.previousClip.w > 0.999 && input.currentClip.z > 0.0001) {
         return float4(GeometryMotion(input.currentClip, input.previousClip.xyz), depth, 2.0);
     }
@@ -211,7 +248,7 @@ DepthTargets DepthPixel(GeometryOutput input)
     DepthTargets output;
     output.primary = SurfaceDepth(input);
     output.cutMotion = 0.0;
-#if MB_VERTEX_HISTORY
+#if MB_GEOMETRY_HISTORY
     if (output.primary.a <= 2.5 && input.previousLocalClip.w > 0.999 && input.currentClip.z > 0.0001) {
         float2 motion = GeometryMotion(input.currentClip, input.previousLocalClip.xyz);
         output.cutMotion = float4(motion, output.primary.b, 1.0);
@@ -234,6 +271,13 @@ float4 DepthPixel(GeometryOutput input) : COLOR0
     MB_CUT_TARGET_STATE \
     VertexShader = compile vs_3_0 ProjectGeometry(); \
     PixelShader = compile ps_3_0 DepthPixel();
+
+#if MB_GEOMETRY_HISTORY
+#define MB_HISTORY_WRITE_STATE \
+    AlphaBlendEnable = FALSE; AlphaTestEnable = FALSE; \
+    ZEnable = FALSE; ZWriteEnable = FALSE; CullMode = NONE; \
+    StencilEnable = FALSE; SRGBWriteEnable = FALSE; ColorWriteEnable = 15;
+#endif
 
 #if MB_VERTEX_HISTORY
 struct AtlasVertex {
@@ -266,11 +310,6 @@ float4 CopyAtlas(float2 quadUV : TEXCOORD0) : COLOR0
     return tex2Dlod(CurrentSampler, float4(uv, 0.0, 0.0));
 }
 
-#define MB_ATLAS_STATE \
-    AlphaBlendEnable = FALSE; AlphaTestEnable = FALSE; \
-    ZEnable = FALSE; ZWriteEnable = FALSE; CullMode = NONE; \
-    StencilEnable = FALSE; SRGBWriteEnable = FALSE; ColorWriteEnable = 15;
-
 // All materials in this object read the snapshot captured before subset zero.
 #define MB_COPY_SCRIPT \
     "RenderColorTarget0=PreviousVertices;" \
@@ -287,7 +326,7 @@ float4 CopyAtlas(float2 quadUV : TEXCOORD0) : COLOR0
     "Pass=RecordHistory;"
 #define MB_COPY_PASS \
     pass CopyHistory < string Script = "Draw=Buffer;"; > { \
-        MB_ATLAS_STATE \
+        MB_HISTORY_WRITE_STATE \
         FillMode = SOLID; \
         VertexShader = compile vs_3_0 ScreenQuad(); \
         PixelShader = compile ps_3_0 CopyAtlas(); \
@@ -295,7 +334,7 @@ float4 CopyAtlas(float2 quadUV : TEXCOORD0) : COLOR0
 #define MB_RECORD_PASSES \
     pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE } \
     pass RecordHistory < string Script = "Draw=Geometry;"; > { \
-        MB_ATLAS_STATE \
+        MB_HISTORY_WRITE_STATE \
         FillMode = POINT; PointSize = 1.0; PointScaleEnable = FALSE; \
         VertexShader = compile vs_3_0 RecordVertex(); \
         PixelShader = compile ps_3_0 RecordPixel(); \
@@ -326,27 +365,51 @@ technique Geometry < string MMDPass = "object"; string Script = MB_RECORD_SCRIPT
 technique GeometrySS < string MMDPass = "object_ss"; string Script = MB_RECORD_SCRIPT; > {
     MB_RECORD_PASSES
 }
+#endif
+
+#if !MB_VERTEX_HISTORY
+#define MB_DRAW_SCRIPT MB_CUT_TARGET_ON "Pass=WriteGeometry;" MB_CUT_TARGET_OFF
+#define MB_DRAW_PASS pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE }
+#if MB_RIGID_HISTORY
+#define MB_RIGID_SCRIPT \
+    "RenderColorTarget0=PreviousRigid;" \
+    "RenderDepthStencilTarget=RigidDepth;" \
+    "Pass=CopyRigidHistory;" \
+    "RenderColorTarget0=CurrentRigid;" \
+    "Pass=RecordRigidHistory;" \
+    "RenderColorTarget0=;" \
+    "RenderDepthStencilTarget=;" \
+    MB_DRAW_SCRIPT
+#define MB_RIGID_PASSES \
+    pass CopyRigidHistory < string Script = "Draw=Buffer;"; > { \
+        MB_HISTORY_WRITE_STATE \
+        FillMode = SOLID; \
+        VertexShader = compile vs_3_0 ScreenQuad(); \
+        PixelShader = compile ps_3_0 CopyRigid(); \
+    } \
+    pass RecordRigidHistory < string Script = "Draw=Buffer;"; > { \
+        MB_HISTORY_WRITE_STATE \
+        FillMode = SOLID; \
+        VertexShader = compile vs_3_0 ScreenQuad(); \
+        PixelShader = compile ps_3_0 RecordRigid(); \
+    }
+
+technique GeometryFirst < string MMDPass = "object"; string Subset = "0"; string Script = MB_RIGID_SCRIPT; > {
+    MB_RIGID_PASSES
+    MB_DRAW_PASS
+}
+technique GeometryFirstSS < string MMDPass = "object_ss"; string Subset = "0"; string Script = MB_RIGID_SCRIPT; > {
+    MB_RIGID_PASSES
+    MB_DRAW_PASS
+}
+#endif
+
+#if MB_RIGID_HISTORY || MB_KEEP_OBJECT_MOTION_ON_CUT
+technique Geometry < string MMDPass = "object"; string Script = MB_DRAW_SCRIPT; > { MB_DRAW_PASS }
+technique GeometrySS < string MMDPass = "object_ss"; string Script = MB_DRAW_SCRIPT; > { MB_DRAW_PASS }
 #else
-#if MB_KEEP_OBJECT_MOTION_ON_CUT
-technique Geometry <
-    string MMDPass = "object";
-    string Script = MB_CUT_TARGET_ON "Pass=WriteGeometry;" MB_CUT_TARGET_OFF;
-> {
-    pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE }
-}
-technique GeometrySS <
-    string MMDPass = "object_ss";
-    string Script = MB_CUT_TARGET_ON "Pass=WriteGeometry;" MB_CUT_TARGET_OFF;
-> {
-    pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE }
-}
-#else
-technique Geometry < string MMDPass = "object"; > {
-    pass WriteGeometry { MB_GEOMETRY_STATE }
-}
-technique GeometrySS < string MMDPass = "object_ss"; > {
-    pass WriteGeometry { MB_GEOMETRY_STATE }
-}
+technique Geometry < string MMDPass = "object"; > { pass WriteGeometry { MB_GEOMETRY_STATE } }
+technique GeometrySS < string MMDPass = "object_ss"; > { pass WriteGeometry { MB_GEOMETRY_STATE } }
 #endif
 #endif
 

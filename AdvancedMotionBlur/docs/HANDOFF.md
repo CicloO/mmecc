@@ -52,7 +52,7 @@ git -C H:/Coding/mmecc worktree add -b AdvancedMotionBlur-codex H:/Coding/mmecc-
 pwsh tools/fxc_matrix.ps1
 ```
 
-24 种配置 × 3 个效果，必须 0 失败。新开关要加进脚本的 `$cases`。
+脚本列出的配置与效果必须 0 失败。新开关要加进脚本的 `$cases`。
 
 ```bash
 python -I tools/d3dx_compile_time.py <临时目录>/amb-fxc-matrix/default/AdvancedMotionBlur.fx
@@ -69,7 +69,7 @@ python -I tools/d3dx_compile_time.py <临时目录>/amb-fxc-matrix/default/Advan
 
 ## 6. 已知的坑
 
-- **编译器**：MME 用 `d3dx9_43`，不是 FXC。运行时才知道次数的循环会被它逐次模拟，一个 1 KB 的 pass 能编译 10 s。循环用常量上限加 `break`（参照 `Foreground.fxh` 的 `MaxTileSpan`／`MaxNeighborSpan`）；同一个搜索循环不要内联多次。
+- **编译器**：MME 用 `d3dx9_43`。它会逐次模拟部分循环，单个很小的 pass 也可能编译约 10 s。参考 `Foreground.fxh` 的常量上限与 `[fastopt]` 分段循环。改完用旧编译器重新计时。
 - **寄存器余量**：`BuildMotionField` 单独按 ps_3_0 编译会报 X4505，放在效果里能过。改描边代码后要确认整个效果仍能编译。
 - **`_INDEX`**：`Geometry.fxh` 用 MME 的顶点序号语义，FXC 和 `d3dx9_43` 都不认识。检查脚本在临时副本里换成 `TEXCOORD7`；源码里不能这么换，MME 不会往 TEXCOORD7 填序号。
 - **覆盖码**（`GeometryData.a`）：0 空，1 相机路径，2 顶点历史，3 半透明，4 原生描边。场景里的 `白背景.x` 会写成 1。

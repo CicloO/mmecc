@@ -62,6 +62,9 @@ texture GeometryData : OFFSCREENRENDERTARGET <
         "*.pmx = MotionGeometry.fx;"
         "*.pmd = MotionGeometry.fx;"
 #endif
+#if MB_ACCESSORY_MOTION
+        "*.x = RigidMotion.fx;"
+#endif
         "* = DepthVelocity.fx;";
 >;
 
