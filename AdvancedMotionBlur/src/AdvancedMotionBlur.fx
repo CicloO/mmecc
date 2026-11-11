@@ -254,9 +254,18 @@ technique AdvancedMotionBlur <
         "Pass=BuildMotion;"
         "RenderColorTarget0=TileMax;"
         "RenderDepthStencilTarget=TileDepth;"
+#if MB_LAYERED_TRAIL
+        "RenderColorTarget1=TileAlternate;"
+#endif
         "Pass=ReduceTiles;"
         "RenderColorTarget0=NeighborMax;"
+#if MB_LAYERED_TRAIL
+        "RenderColorTarget1=NeighborAlternate;"
+#endif
         "Pass=ReduceNeighbors;"
+#if MB_LAYERED_TRAIL
+        "RenderColorTarget1=;"
+#endif
 #endif
         "RenderColorTarget0=;"
         "RenderDepthStencilTarget=;"
@@ -278,10 +287,16 @@ technique AdvancedMotionBlur <
     }
     pass ReduceTiles < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
+#if MB_LAYERED_TRAIL
+        ColorWriteEnable1 = 15;
+#endif
         PixelShader = compile ps_3_0 BuildTileMax();
     }
     pass ReduceNeighbors < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
+#if MB_LAYERED_TRAIL
+        ColorWriteEnable1 = 15;
+#endif
         PixelShader = compile ps_3_0 BuildNeighborMax();
     }
 #endif

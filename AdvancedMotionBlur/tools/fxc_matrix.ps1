@@ -37,6 +37,7 @@ $cases = @(
     @{ Name = 'nooutline'; Set = @{ MB_OUTLINE_MOTION = '0' } },
     @{ Name = 'noauto'; Set = @{ MB_AUTO_MODEL_MOTION = '0' } },
     @{ Name = 'nocutprobe'; Set = @{ MB_CUT_SCREEN_HEIGHT = '0.0' } },
+    @{ Name = 'layered'; Set = @{ MB_LAYERED_TRAIL = '1' } },
     @{ Name = 'thresh8'; Set = @{ MB_SPEED_THRESHOLD = '8.0' } },
     @{ Name = 'thresh8p0'; Set = @{ MB_SPEED_THRESHOLD = '8.0'; MB_EXTEND_FOREGROUND = '0' } },
     @{ Name = 'legacy020'; Set = @{ MB_SHUTTER_ANGLE = '180.0'; MB_MOTION_SCALE = '1.0'; MB_MAX_STREAK = '48.0'; MB_SPEED_THRESHOLD = '0.0' } }
