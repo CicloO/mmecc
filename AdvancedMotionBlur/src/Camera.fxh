@@ -130,6 +130,12 @@ float4 AnalyzeCameraFrame() : COLOR0
         float zoomRatio = Projection[1][1] / max(previousForward.w, 0.0001);
         cut = cut || zoomRatio < 0.75 || zoomRatio > 1.33;
     }
+    if (ControllerWeight(ControlKeepCamera) >= 0.5) {
+        cut = false;
+    }
+    if (ControllerWeight(ControlForceCut) >= 0.5) {
+        cut = true;
+    }
     // A cut is not part of the next shot's velocity history.
     return float4(dt, ExposureScale(), cut ? 0.0 : speed, cut ? 1.0 : 0.0);
 }

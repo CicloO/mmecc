@@ -12,6 +12,8 @@ MB_MORPH_WEIGHT(ControlShutterDown, "Shutter -")
 MB_MORPH_WEIGHT(ControlStreakUp, "Streak +")
 MB_MORPH_WEIGHT(ControlStreakDown, "Streak -")
 MB_MORPH_WEIGHT(ControlThreshold, "Threshold")
+MB_MORPH_WEIGHT(ControlForceCut, "Force Cut")
+MB_MORPH_WEIGHT(ControlKeepCamera, "Keep Camera")
 
 #undef MB_MORPH_WEIGHT
 

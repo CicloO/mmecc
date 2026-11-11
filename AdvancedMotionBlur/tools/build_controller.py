@@ -13,6 +13,8 @@ MORPHS = (
     ("Streak +", 3),
     ("Streak -", 3),
     ("Threshold", 4),
+    ("Force Cut", 4),
+    ("Keep Camera", 4),
 )
 
 
