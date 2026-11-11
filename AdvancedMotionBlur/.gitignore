@@ -1,0 +1,10 @@
+# Local MMD export videos and test projects (large, machine-specific paths)
+test/*.mp4
+test/*.mov
+test/*.avi
+*.pmm
+*.emm
+
+# Compiled effects and Python caches
+*.fxo
+__pycache__/

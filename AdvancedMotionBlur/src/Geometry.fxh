@@ -17,6 +17,8 @@ sampler2D MaterialSampler = sampler_state {
 };
 
 #if MB_VERTEX_HISTORY
+#include "Fullscreen.fxh"
+
 float2 TargetSize : VIEWPORTPIXELSIZE;
 float Timeline : TIME < bool SyncInEditMode = true; >;
 float Elapsed : ELAPSEDTIME < bool SyncInEditMode = true; >;
@@ -144,14 +146,9 @@ float4 RecordPixel(float4 data : TEXCOORD0) : COLOR0
     return data;
 }
 
-float4 AtlasQuad(float4 position : POSITION) : POSITION
+float4 CopyAtlas(float2 quadUV : TEXCOORD0) : COLOR0
 {
-    return position;
-}
-
-float4 CopyAtlas(float2 pixel : VPOS) : COLOR0
-{
-    float2 uv = (pixel + 0.5) / MB_HISTORY_SIZE;
+    float2 uv = quadUV + 0.5 / MB_HISTORY_SIZE;
     return tex2Dlod(CurrentSampler, float4(uv, 0.0, 0.0));
 }
 
@@ -176,12 +173,12 @@ float4 CopyAtlas(float2 pixel : VPOS) : COLOR0
     pass CopyHistory < string Script = "Draw=Buffer;"; > { \
         MB_ATLAS_STATE \
         FillMode = SOLID; \
-        VertexShader = compile vs_3_0 AtlasQuad(); \
+        VertexShader = compile vs_3_0 ScreenQuad(); \
         PixelShader = compile ps_3_0 CopyAtlas(); \
     }
 #define MB_RECORD_PASSES \
-    pass WriteGeometry { MB_GEOMETRY_STATE } \
-    pass RecordHistory { \
+    pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE } \
+    pass RecordHistory < string Script = "Draw=Geometry;"; > { \
         MB_ATLAS_STATE \
         FillMode = POINT; PointSize = 1.0; PointScaleEnable = FALSE; \
         VertexShader = compile vs_3_0 RecordVertex(); \
@@ -222,6 +219,42 @@ technique GeometrySS < string MMDPass = "object_ss"; > {
 }
 #endif
 
+#if MB_EXTEND_FOREGROUND && MB_OUTLINE_MOTION
+float4 OutlineColor : EDGECOLOR;
+
+struct OutlineOutput {
+    float4 position : POSITION;
+    float viewDepth : TEXCOORD0;
+};
+
+OutlineOutput ProjectOutline(float4 position : POSITION)
+{
+    // MMD's edge pass already supplies the expanded hull vertices.
+    OutlineOutput output;
+    output.position = mul(position, ObjectToClip);
+    output.viewDepth = mul(position, ObjectToView).z;
+    return output;
+}
+
+float4 OutlineDepth(OutlineOutput input) : COLOR0
+{
+    clip(OutlineColor.a - 0.004);
+    float coverage = OutlineColor.a >= 0.985 ? 4.0 : 3.0;
+    return float4(0.0, 0.0, log2(max(input.viewDepth, 0.0001)), coverage);
+}
+
+technique OutlineGeometry < string MMDPass = "edge"; > {
+    pass WriteOutline < string Script = "Draw=Geometry;"; > {
+        AlphaBlendEnable = FALSE; AlphaTestEnable = FALSE;
+        ZEnable = TRUE; ZWriteEnable = TRUE; ZFunc = LESS;
+        CullMode = CW; FillMode = SOLID; StencilEnable = FALSE;
+        SRGBWriteEnable = FALSE; ColorWriteEnable = 15;
+        VertexShader = compile vs_3_0 ProjectOutline();
+        PixelShader = compile ps_3_0 OutlineDepth();
+    }
+}
+#else
 technique NoEdge < string MMDPass = "edge"; > {}
+#endif
 technique NoShadow < string MMDPass = "shadow"; > {}
 technique NoZPlot < string MMDPass = "zplot"; > {}
