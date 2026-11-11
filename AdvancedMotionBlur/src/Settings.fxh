@@ -6,7 +6,8 @@
 #define MB_SPEED_THRESHOLD 3.0     // Streak px removed from every pixel; slow parts stay sharp
 #define MB_DEPTH_TOLERANCE 0.045   // Log2 depth tolerance; roughly 3% before soft falloff
 #define MB_CUT_ANGLE_COS 0.7660444 // 40 degree orientation change
-#define MB_MAX_FRAME_GAP 0.0501    // Seconds
+#define MB_MIN_FRAME_GAP 0.0001    // Seconds; ignore duplicate timestamps and float noise
+#define MB_MAX_FRAME_GAP 0.1001    // Seconds, including a 3-frame gap at 30 fps
 #define MB_CLEAR_RGBA 1.0, 1.0, 1.0, 0.0
 #define MB_DEBUG 0                 // 0: result; 1: source; 2: motion; 3: depth; 4: coverage
 #define MB_EXTEND_FOREGROUND 1     // 0: use the P0 within-surface blur

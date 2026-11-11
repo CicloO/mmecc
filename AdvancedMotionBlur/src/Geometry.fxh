@@ -21,7 +21,6 @@ sampler2D MaterialSampler = sampler_state {
 
 float2 TargetSize : VIEWPORTPIXELSIZE;
 float Timeline : TIME < bool SyncInEditMode = true; >;
-float Elapsed : ELAPSEDTIME < bool SyncInEditMode = true; >;
 int VertexCount;
 
 texture CurrentVertices : RENDERCOLORTARGET <
@@ -82,8 +81,8 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
     float2 atlasUV = (AtlasCell(index) + 0.5) / MB_HISTORY_SIZE;
     float4 stored = tex2Dlod(PreviousSampler, float4(atlasUV, 0.0, 0.0));
     float dt = Timeline - (stored.w - 1.0);
-    bool valid = FitsAtlas(index) && stored.w >= 1.0 && dt > 0.001 && dt <= MB_MAX_FRAME_GAP
-        && abs(dt - Elapsed) <= 0.002 && stored.z > 0.0001;
+    bool valid = FitsAtlas(index) && stored.w >= 1.0 && stored.z > 0.0001
+        && dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP;
     output.previousClip = valid ? float4(stored.xyz, 1.0) : 0.0;
     output.currentClip = output.position.xyw;
 #endif

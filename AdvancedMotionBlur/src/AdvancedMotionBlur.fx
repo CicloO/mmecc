@@ -104,7 +104,7 @@ float CameraInterval()
     float4 timing = PreviousCamera(4.0);
     float dt = Timeline - timing.x;
     if (timing.w != 319.25 || any(abs(timing.yz - ScreenSize) > 0.5)
-        || !(dt > 0.001 && dt <= MB_MAX_FRAME_GAP)) {
+        || !(dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP)) {
         return 0.0;
     }
     float4 previousForward = PreviousCamera(5.0);
