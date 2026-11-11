@@ -5,6 +5,9 @@ test/*.avi
 *.pmm
 *.emm
 
+# Release zips are built at release time and attached to GitHub Releases
+dist/
+
 # Compiled effects and Python caches
 *.fxo
 __pycache__/

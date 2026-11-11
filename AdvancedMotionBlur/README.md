@@ -1,4 +1,4 @@
-# Advanced Motion Blur for MMD · P1 控制器版
+# Advanced Motion Blur for MMD 0.2.0 · P1 控制器版
 
 作者：CicloO · 协作：Codex、Claude
 
@@ -11,9 +11,12 @@ Codex 与 Claude 的协作约定见 [CLAUDE.md](CLAUDE.md)。验证证据与后�
 | `src/` | `.x` 附件、着色器、头文件和可选的 PMX 控制器 |
 | `docs/` | [参数手册](docs/PARAMETERS.md)、验证记录和截图 |
 | `fixtures/` | 测试场景与动作 |
-| `test/` | 用户从 MMD 导出的 P0 对照视频 |
-| `dist/` | 原始 P0 发布包，P1 从 `src/` 加载 |
+| `test/` | 用户从 MMD 导出的 P0 对照视频（本地，不入库） |
+| `dist/` | 发布时生成的 zip（本地，不入库） |
 | `tools/build_controller.py` | 用 Python 重新生成 PMX 控制器 |
+| [CHANGELOG.md](CHANGELOG.md) | 各版本的改动 |
+
+下载打包好的版本：GitHub Releases 中标签为 `AdvancedMotionBlur/v*` 的发布。
 
 面向原版 MikuMikuDance 9.32 x64 + MME 0.37 的独立动态模糊原型。默认在辅助渲染目标为 PMX／PMD 记录顶点历史，覆盖角色变形和镜头运动。场景附件和缺少有效顶点历史的像素通过深度重建镜头运动。
 
