@@ -1,6 +1,6 @@
 # 更新日志
 
-标签格式为 `AdvancedMotionBlur/v<版本>`，对应 GitHub Release 附带打包好的 zip。
+标签格式为 `AdvancedMotionBlur/v<版本>`。
 
 ## 0.2.0 · P1 控制器版
 

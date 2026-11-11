@@ -24,7 +24,7 @@
 - `tools/build_controller.py`：重新生成 PMX 控制器；修改表情名时同步 `src/Controller.fxh`。
 - `docs/PARAMETERS.md`：参数手册与控制器表情说明。
 - `docs/validation/`、`fixtures/`：验证截图与测试场景。
-- `dist/`：发布时生成的 zip，不入库。
+- `dist/`：各版本 zip，只存在本地，不入库也不上传。
 - `CHANGELOG.md`：各版本改动。
 
 ## 版本与发布
@@ -36,7 +36,6 @@
 git tag -a AdvancedMotionBlur/v0.2.0 -m "AdvancedMotionBlur 0.2.0"
 git archive --format=zip --prefix=MMD-AdvancedMotionBlur/ -o AdvancedMotionBlur/dist/MMD-AdvancedMotionBlur-0.2.0.zip AdvancedMotionBlur/v0.2.0:AdvancedMotionBlur README.md CHANGELOG.md src docs fixtures
 git push origin AdvancedMotionBlur/v0.2.0
-gh release create AdvancedMotionBlur/v0.2.0 AdvancedMotionBlur/dist/MMD-AdvancedMotionBlur-0.2.0.zip --title "AdvancedMotionBlur 0.2.0" --notes-file <本版 CHANGELOG 段落>
 ```
 
-- zip 只含已提交的 `README.md`、`CHANGELOG.md`、`src/`、`docs/`、`fixtures/`，不含 `CLAUDE.md`、`tools/` 和本地测试文件。推送标签和发布前先说明内容并得到用户确认。
+- 不创建 GitHub Release，zip 只保存在本地 `dist/`。zip 只含已提交的 `README.md`、`CHANGELOG.md`、`src/`、`docs/`、`fixtures/`，不含 `CLAUDE.md`、`tools/` 和本地测试文件。推送标签前先说明内容并得到用户确认。
