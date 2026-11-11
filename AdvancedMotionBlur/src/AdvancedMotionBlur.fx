@@ -270,6 +270,11 @@ technique AdvancedMotionBlur <
         "RenderColorTarget0=MotionField;"
         "RenderDepthStencilTarget=SceneDepth;"
         "Pass=BuildMotion;"
+#if !MB_LAYERED_TRAIL
+        "RenderColorTarget0=TileRows;"
+        "RenderDepthStencilTarget=TileRowsDepth;"
+        "Pass=ReduceTileRows;"
+#endif
         "RenderColorTarget0=TileMax;"
         "RenderDepthStencilTarget=TileDepth;"
 #if MB_LAYERED_TRAIL
@@ -310,6 +315,12 @@ technique AdvancedMotionBlur <
         MB_SCREEN_STATE
         PixelShader = compile ps_3_0 BuildMotionField();
     }
+#if !MB_LAYERED_TRAIL
+    pass ReduceTileRows < string Script = "Draw=Buffer;"; > {
+        MB_SCREEN_STATE
+        PixelShader = compile ps_3_0 BuildTileRows();
+    }
+#endif
     pass ReduceTiles < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
 #if MB_LAYERED_TRAIL

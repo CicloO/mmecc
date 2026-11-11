@@ -12,6 +12,11 @@ texture NeighborMax : RENDERCOLORTARGET < MB_TILE_RATIO string Format = "A16B16G
 #if MB_LAYERED_TRAIL
 texture TileAlternate : RENDERCOLORTARGET < MB_TILE_RATIO string Format = "A16B16G16R16F"; >;
 texture NeighborAlternate : RENDERCOLORTARGET < MB_TILE_RATIO string Format = "A16B16G16R16F"; >;
+#else
+#define MB_TILE_ROW_RATIO float2 ViewPortRatio = {0.03125, 1.0};
+texture TileRows : RENDERCOLORTARGET < MB_TILE_ROW_RATIO string Format = "A16B16G16R16F"; >;
+texture TileRowsDepth : RENDERDEPTHSTENCILTARGET < MB_TILE_ROW_RATIO >;
+#undef MB_TILE_ROW_RATIO
 #endif
 texture TileDepth : RENDERDEPTHSTENCILTARGET < MB_TILE_RATIO >;
 #undef MB_TILE_RATIO
@@ -22,6 +27,8 @@ sampler2D NeighborSampler = sampler_state { Texture = <NeighborMax>; MB_POINT_FI
 #if MB_LAYERED_TRAIL
 sampler2D TileAlternateSampler = sampler_state { Texture = <TileAlternate>; MB_POINT_FILTER };
 sampler2D NeighborAlternateSampler = sampler_state { Texture = <NeighborAlternate>; MB_POINT_FILTER };
+#else
+sampler2D TileRowsSampler = sampler_state { Texture = <TileRows>; MB_POINT_FILTER };
 #endif
 
 #if MB_OUTLINE_MOTION
@@ -47,10 +54,15 @@ float4 BuildMotionField(float2 quadUV : TEXCOORD0) : COLOR0
     return float4(streak, geometry.b, coverage);
 }
 
-// Upper bounds for the reduction loops. A tile covers about 32 px; allow for
-// MME's ratio rounding. The neighbour search reaches half the largest streak
-// (MB_MAX_STREAK with Streak + at 1) plus 1 px, in tiles of at least 24 px.
+// A tile covers about 32 px and can reach 63 px if the ratio rounds down to
+// one tile. The two-layer pass uses its original bound and scan order.
+#if MB_LAYERED_TRAIL
 #define MaxTileSpan 40
+#else
+#define MaxTileSpan 63
+#endif
+// The neighbour search reaches half the largest streak
+// (MB_MAX_STREAK with Streak + at 1) plus 1 px, in tiles of at least 24 px.
 #define MaxNeighborSpan (2 * (int)ceil((max(MB_MAX_STREAK, 0.0) + 1.0) / 24.0) + 1)
 
 float2 TileRasterSize(float2 quadUV)
@@ -116,6 +128,31 @@ void AccumulateTile(inout TileReduction best, float3 candidate, float nearest, f
     }
 }
 
+#if !MB_LAYERED_TRAIL
+TileOutput BuildTileRows(float2 quadUV : TEXCOORD0)
+{
+    float2 rasterSize = TileRasterSize(quadUV);
+    TileReduction best = (TileReduction)0;
+    best.nearest = 128.0;
+    [branch]
+    if (!FrameHasExposure()) {
+        return FinishTile(best);
+    }
+    float2 tileRow = floor(quadUV * rasterSize + 0.5);
+    float span = ScreenSize.x / rasterSize.x;
+    float first = floor(tileRow.x * span + 0.5);
+    float count = min(ScreenSize.x, floor((tileRow.x + 1.0) * span + 0.5)) - first;
+    [loop]
+    for (int i = 0; i < MaxTileSpan; ++i) {
+        if (i >= count) break;
+        float2 uv = (float2(first + i, tileRow.y) + 0.5) / ScreenSize;
+        float3 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0)).rgb;
+        AccumulateTile(best, motion, motion.b, dot(motion.rg, motion.rg));
+    }
+    return FinishTile(best);
+}
+#endif
+
 TileOutput BuildTileMax(float2 quadUV : TEXCOORD0)
 {
     float2 rasterSize = TileRasterSize(quadUV);
@@ -126,6 +163,7 @@ TileOutput BuildTileMax(float2 quadUV : TEXCOORD0)
         return FinishTile(best);
     }
     float2 tile = floor(quadUV * rasterSize + 0.5);
+#if MB_LAYERED_TRAIL
     float2 tileSpan = ScreenSize / rasterSize;
     float2 first = floor(tile * tileSpan + 0.5);
     float2 count = min(ScreenSize, floor((tile + 1.0) * tileSpan + 0.5)) - first;
@@ -142,6 +180,19 @@ TileOutput BuildTileMax(float2 quadUV : TEXCOORD0)
             AccumulateTile(best, sampleMotion, sampleMotion.b, dot(sampleMotion.rg, sampleMotion.rg));
         }
     }
+#else
+    float span = ScreenSize.y / rasterSize.y;
+    float first = floor(tile.y * span + 0.5);
+    float count = min(ScreenSize.y, floor((tile.y + 1.0) * span + 0.5)) - first;
+    // First strongest row wins a tie, matching the row-major pixel scan.
+    [loop]
+    for (int j = 0; j < MaxTileSpan; ++j) {
+        if (j >= count) break;
+        float2 uv = (float2(tile.x, first + j) + 0.5) / float2(rasterSize.x, ScreenSize.y);
+        float3 motion = tex2Dlod(TileRowsSampler, float4(uv, 0.0, 0.0)).rgb;
+        AccumulateTile(best, motion, motion.b, dot(motion.rg, motion.rg));
+    }
+#endif
     return FinishTile(best);
 }
 
