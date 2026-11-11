@@ -18,7 +18,7 @@ git -C H:/Coding/mmecc worktree add -b AdvancedMotionBlur-codex H:/Coding/mmecc-
 
 ## 1. 硬性原则
 
-1. **默认观感不变。** 默认设置下，没有切镜、没有瞬移的普通帧，输出应与基准逐像素一致（或只有浮点级差异）。任何会改变观感的东西都做成 `Settings.fxh` 开关并默认关闭。
+1. 普通帧继续和基准做像素与观感对照。会改变画面的候选功能用 `Settings.fxh` 开关提供对照，验收通过后在开发分支默认打开。涉及原生 MME 绑定或用户场景的改动，在对应实机验证前保持候选状态。
 2. 每项一个提交，提交前跑第 4 节的两项检查。
 3. 文档全部中文，按现有风格更新：`CHANGELOG.md`“未发布”一节、`docs/VALIDATION.md`（区分已运行与“未运行”，不把编译通过写成画面验收）、新增开关写进 `README.md` 参数表和 `docs/PARAMETERS.md`。
 4. 提交署名只用 CicloO，不加 `Co-Authored-By` 或任何 AI 署名。

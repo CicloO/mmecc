@@ -85,6 +85,12 @@ TileOutput FinishTile(TileReduction reduction)
     return result;
 }
 
+bool FrameHasExposure()
+{
+    float4 camera = CurrentCameraAnalysis();
+    return CameraBlurInterval(camera) > 0.0 && camera.y > 0.0;
+}
+
 // RG carries a search direction. Track its depth and the nearest depth
 // separately so a layer change cannot borrow the wrong motion.
 void AccumulateTile(inout TileReduction best, float3 candidate, float nearest, float lengthSquared)
@@ -115,6 +121,10 @@ TileOutput BuildTileMax(float2 quadUV : TEXCOORD0)
     float2 rasterSize = TileRasterSize(quadUV);
     TileReduction best = (TileReduction)0;
     best.nearest = 128.0;
+    [branch]
+    if (!FrameHasExposure()) {
+        return FinishTile(best);
+    }
     float2 tile = floor(quadUV * rasterSize + 0.5);
     float2 tileSpan = ScreenSize / rasterSize;
     float2 first = floor(tile * tileSpan + 0.5);
@@ -153,6 +163,10 @@ TileOutput BuildNeighborMax(float2 quadUV : TEXCOORD0)
     float2 rasterSize = TileRasterSize(quadUV);
     TileReduction best = (TileReduction)0;
     best.nearest = 128.0;
+    [branch]
+    if (!FrameHasExposure()) {
+        return FinishTile(best);
+    }
     float2 tile = floor(quadUV * rasterSize + 0.5);
     float2 tileSpan = ScreenSize / rasterSize;
     float2 radius = ceil((0.5 * MotionStreakLimit() + 1.0) / tileSpan);
