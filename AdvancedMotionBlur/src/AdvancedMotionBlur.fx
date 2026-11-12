@@ -1,6 +1,7 @@
 #include "Settings.fxh"
 #include "Fullscreen.fxh"
 #include "ModelTiming.fxh"
+#include "Coverage.fxh"
 
 float2 ScreenSize : VIEWPORTPIXELSIZE;
 
@@ -112,7 +113,7 @@ float ExposureScale()
 float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
 {
     float dt = CameraBlurInterval(camera);
-    if (dt <= 0.0 || geometry.a <= 0.0 || geometry.a > 2.5) {
+    if (dt <= 0.0 || !HasGeometryCoverage(geometry.a) || geometry.a > 2.5) {
         return 0.0;
     }
     float2 delta;
@@ -124,7 +125,12 @@ float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
     } else
 #endif
     {
-        delta = HasModelMotion(geometry.a, dt) ? geometry.rg : CameraDisplacement(uv, geometry.b);
+#if MB_TRANSLUCENT_MOTION
+        float motionCoverage = abs(geometry.a);
+#else
+        float motionCoverage = geometry.a;
+#endif
+        delta = HasModelMotion(motionCoverage, dt) ? geometry.rg : CameraDisplacement(uv, geometry.b);
     }
     float distance = length(delta);
     if (!(distance >= 0.01 && distance < length(ScreenSize) * 0.65)) {
@@ -165,17 +171,19 @@ static const float DepthTolerance = max(MB_DEPTH_TOLERANCE, 0.0001);
 // left to ExtendForeground; translucent taps stay excluded.
 float TapWeight(float4 center, float4 sampleGeometry, float sampleAlpha)
 {
-    if (sampleGeometry.a > 2.5 && sampleGeometry.a < 3.5) {
+    if (IsProtectedSurface(sampleGeometry.a)) {
         return 0.0;
     }
-    if (sampleGeometry.a <= 0.0) {
+    if (!HasGeometryCoverage(sampleGeometry.a)) {
         return MB_EDGE_BACKGROUND ? 1.0 : 0.0;
     }
     float gap = sampleGeometry.b - center.b;
     float same = 1.0 - smoothstep(DepthTolerance, DepthTolerance * 2.0, abs(gap));
     float weight = same * sampleAlpha;
 #if MB_EDGE_BACKGROUND
-    weight += smoothstep(DepthTolerance, DepthTolerance * 2.0, gap);
+    if (!IsOrdinaryTranslucent(center.a) && !IsOrdinaryTranslucent(sampleGeometry.a)) {
+        weight += smoothstep(DepthTolerance, DepthTolerance * 2.0, gap);
+    }
 #endif
     return weight;
 }
@@ -201,7 +209,7 @@ static const float MaxTaps = 64.0;
 
 float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 {
-    bool outline = geometry.a > 3.5;
+    bool outline = geometry.a > 3.5 && !IsAdditive(geometry.a);
     float streakLength = length(streak);
     if (streakLength < MinStreak() || (color.a <= 0.004 && !outline)) {
         return color;
@@ -233,13 +241,24 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 #else
         float4 tapGeometry = tex2Dlod(GeometrySampler, float4(tapUV, 0.0, 0.0));
 #endif
+#if MB_TRANSLUCENT_MOTION
+        // Keep color and depth on the same texel near translucent layers.
+        float4 tapColor;
+        [branch]
+        if (IsOrdinaryTranslucent(geometry.a) || IsOrdinaryTranslucent(tapGeometry.a)) {
+            tapColor = tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0));
+        } else {
+            tapColor = tex2Dlod(SceneTapSampler, float4(tapUV, 0.0, 0.0));
+        }
+#else
         float4 tapColor = tex2Dlod(SceneTapSampler, float4(tapUV, 0.0, 0.0));
+#endif
 #if MB_USE_TRAIL_ALPHA
         // Capture already stores premultiplied color, so average RGBA with the same weights.
         float weight = inside * TapWeight(geometry, tapGeometry, 1.0);
         sum += tapColor * weight;
 #else
-        float alpha = tapGeometry.a > 3.5 ? 1.0 : tapColor.a;
+        float alpha = tapGeometry.a > 3.5 && !IsAdditive(tapGeometry.a) ? 1.0 : tapColor.a;
         float weight = inside * TapWeight(geometry, tapGeometry, alpha);
         sum += tapColor.rgb * weight;
 #endif
@@ -267,15 +286,18 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     float4 geometry = tex2Dlod(GeometrySampler, float4(uv, 0.0, 0.0));
 #if MB_DEBUG == 3
     float depth = saturate((geometry.b + 2.0) / 11.0);
-    return float4(depth.xxx * (geometry.a > 0.0), 1.0);
+    return float4(depth.xxx * HasGeometryCoverage(geometry.a), 1.0);
 #elif MB_DEBUG == 4
+    if (IsOrdinaryTranslucent(geometry.a) || IsAdditive(geometry.a)) {
+        return float4(1.0, 0.0, 0.0, 1.0);
+    }
     if (geometry.a > 3.5) {
         return float4(1.0, 1.0, 0.0, 1.0);
     }
     bool modelMotion = HasModelMotion(geometry.a, CurrentCameraAnalysis().x);
     return float4(geometry.a > 2.5, modelMotion, geometry.a > 0.0 && geometry.a < 2.5 && !modelMotion, 1.0);
 #elif MB_DEBUG == 5
-    if (geometry.a < 4.5) {
+    if (geometry.a < 4.5 || IsAdditive(geometry.a)) {
         return float4(0.0, 0.0, 0.0, 1.0);
     }
     bool direct = geometry.r <= 0.05;

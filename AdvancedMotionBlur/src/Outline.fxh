@@ -49,6 +49,9 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
     offset = 0.0;
     coverage = center.a;
     float4 resolved = center;
+    if (IsOrdinaryTranslucent(center.a) || IsAdditive(center.a)) {
+        return resolved;
+    }
     float2 texel = 1.0 / ScreenSize;
     if (center.a > 3.5) {
         // An expanded vertex and its unexpanded history cannot be subtracted.
@@ -83,7 +86,8 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
         float4 neighbor = tex2Dlod(GeometrySampler, float4(uv + step * texel, 0.0, 0.0));
         bool behind = center.a <= 0.0 || center.b - neighbor.b > DepthTolerance;
         bool sameLayer = abs(center.b - neighbor.b) <= 2.0 * DepthTolerance;
-        if (!touchesOutline && neighbor.a > 3.5 && (translucent ? (behind || sameLayer) : behind)) {
+        if (!touchesOutline && neighbor.a > 3.5 && !IsAdditive(neighbor.a) &&
+            (translucent ? (behind || sameLayer) : behind)) {
             touchesOutline = true;
             outlineDepth = neighbor.b;
         }
@@ -118,7 +122,7 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
             bool useA = IsOpaqueSurface(a) && (!IsOpaqueSurface(b) || a.b < b.b);
             float4 front = useA ? a : b;
             float4 back = useA ? b : a;
-            bool sameBack = center.a <= 0.0 ? back.a <= 0.0
+            bool sameBack = center.a <= 0.0 ? !HasGeometryCoverage(back.a)
                 : IsOpaqueSurface(back) && abs(back.b - center.b) <= DepthTolerance;
             bool closer = center.a <= 0.0 || center.b - front.b > DepthTolerance;
             if (IsOpaqueSurface(front) && sameBack && closer && (coverage < 3.5 || front.b < resolved.b)) {

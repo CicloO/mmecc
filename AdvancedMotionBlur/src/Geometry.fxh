@@ -1,5 +1,6 @@
 #include "Settings.fxh"
 #include "ModelTiming.fxh"
+#include "Coverage.fxh"
 
 #ifndef MB_RIGID_HISTORY
 #define MB_RIGID_HISTORY 0
@@ -233,15 +234,22 @@ float4 SurfaceDepth(GeometryOutput input)
 #if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
     return float4(input.projectionError, depth, 5.0);
 #else
+#if MB_TRANSLUCENT_MOTION
+    if (opadd) {
+        return float4(0.0, 0.0, depth, AdditiveCoverage);
+    }
+    float coverage = alpha >= 0.985 ? 1.0 : -1.0;
+#else
     float coverage = (alpha >= 0.985 && !opadd) ? 1.0 : 3.0;
+#endif
 #if MB_GEOMETRY_HISTORY
-    if (coverage == 1.0 && input.previousClip.w > 0.999 && input.currentClip.z > 0.0001) {
+    if (abs(coverage) == 1.0 && input.previousClip.w > 0.999 && input.currentClip.z > 0.0001) {
 #if MB_VERTEX_HISTORY && !MB_KEEP_OBJECT_MOTION_ON_CUT
         float motionCoverage = EncodeModelInterval(input.historyInterval);
 #else
         float motionCoverage = 2.0;
 #endif
-        return float4(GeometryMotion(input.currentClip, input.previousClip.xyz), depth, motionCoverage);
+        return float4(GeometryMotion(input.currentClip, input.previousClip.xyz), depth, coverage * motionCoverage);
     }
 #endif
     return float4(0.0, 0.0, depth, coverage);

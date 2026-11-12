@@ -89,8 +89,9 @@ float MedianScreenDisplacement()
             * (0.5 * float2(ScreenSize.x / ScreenSize.y, 1.0));
         // Behind the old camera counts as a large change. Empty probes sort last.
         float distance = oldClip.w <= 0.0001 ? 4.0 : min(length(displacement), 4.0);
-        samples[i] = geometry.a > 0.0 ? distance : 8.0;
-        valid += geometry.a > 0.0 ? 1 : 0;
+        bool present = HasGeometryCoverage(geometry.a);
+        samples[i] = present ? distance : 8.0;
+        valid += present ? 1 : 0;
     }
     [unroll]
     for (int left = 0; left < 3; ++left) {

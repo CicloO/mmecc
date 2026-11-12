@@ -52,7 +52,24 @@ float4 BuildMotionField(float2 quadUV : TEXCOORD0) : COLOR0
     if (coverage > 0.0 && coverage < 0.5) {
         coverage = 2.0;
     }
+#if MB_TRANSLUCENT_MOTION
+    if (IsOrdinaryTranslucent(coverage)) {
+        coverage = TranslucentSurface;
+#if MB_USE_TRAIL_ALPHA
+        // An opaque capture already includes the layer behind the material.
+        float alpha = tex2Dlod(SceneSampler, float4(uv, 0.0, 0.0)).a;
+        if (alpha > 0.004 && alpha < 0.985) {
+            coverage = TranslucentTrailSource;
+        }
+#endif
+    }
+#endif
     return float4(streak, geometry.b, coverage);
+}
+
+bool CanExtendTrail(float coverage)
+{
+    return !IsOrdinaryTranslucent(coverage) || coverage == TranslucentTrailSource;
 }
 
 // A tile covers about 32 px and can reach 63 px if the ratio rounds down to one tile.
@@ -115,8 +132,10 @@ float4 BuildTileRows(float2 quadUV : TEXCOORD0) : COLOR0
     for (int i = 0; i < MaxTileSpan; ++i) {
         if (i >= count) break;
         float2 uv = (float2(first + i, tileRow.y) + 0.5) / ScreenSize;
-        float3 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0)).rgb;
-        AccumulateTile(best, motion, motion.b, dot(motion.rg, motion.rg));
+        float4 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
+        if (CanExtendTrail(motion.a)) {
+            AccumulateTile(best, motion.rgb, motion.b, dot(motion.rg, motion.rg));
+        }
     }
     return FinishTile(best);
 }
@@ -173,11 +192,11 @@ float4 BuildTileAlternate(float2 quadUV : TEXCOORD0) : COLOR0
         for (int i = 0; i < MaxTileSpan; ++i) {
             if (i >= count.x) break;
             float2 uv = (first + float2(i, j) + 0.5) / ScreenSize;
-            float3 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0)).rgb;
+            float4 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
             float lengthSquared = dot(motion.rg, motion.rg);
-            if (lengthSquared >= MinStreak() * MinStreak() && lengthSquared > best.a &&
+            if (CanExtendTrail(motion.a) && lengthSquared >= MinStreak() * MinStreak() && lengthSquared > best.a &&
                 abs(motion.b - primary.a) > 2.0 * DepthTolerance) {
-                best = float4(motion, lengthSquared);
+                best = float4(motion.rgb, lengthSquared);
             }
         }
     }
@@ -279,12 +298,12 @@ float4 GatherForeground(float2 uv, float4 background, float4 center, float3 neig
 #else
 float4 ExtendForeground(float2 uv, float4 background, float4 center)
 {
-    if (center.a > 2.5 && center.a < 3.5) {
+    if (IsProtectedSurface(center.a)) {
         return background;
     }
     float3 neighbor = tex2Dlod(NeighborSampler, float4(uv, 0.0, 0.0)).rgb;
 #endif
-    bool hasDepth = center.a >= 0.5;
+    bool hasDepth = center.a >= 0.5 || IsOrdinaryTranslucent(center.a);
     float streakLength = length(neighbor.rg);
     if (streakLength < MinStreak() || (hasDepth && center.b - neighbor.b <= DepthTolerance)) {
         return background;
@@ -331,6 +350,9 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
         }
         float2 tapUV = samplePixel / ScreenSize;
         float4 source = tex2Dlod(MotionSampler, float4(tapUV, 0.0, 0.0));
+        if (!CanExtendTrail(source.a)) {
+            continue;
+        }
 #if MB_LAYERED_TRAIL
         if (depthSide != 0.0 && (source.b < splitDepth) != (depthSide < 0.0)) {
             continue;
@@ -385,7 +407,7 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
 #if MB_LAYERED_TRAIL
 float4 ExtendForeground(float2 uv, float4 background, float4 center)
 {
-    if (center.a > 2.5 && center.a < 3.5) {
+    if (IsProtectedSurface(center.a)) {
         return background;
     }
     float4 primary = tex2Dlod(NeighborSampler, float4(uv, 0.0, 0.0));

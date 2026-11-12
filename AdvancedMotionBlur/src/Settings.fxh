@@ -13,6 +13,7 @@
 #define MB_MAX_FRAME_GAP 0.1001    // Seconds, including a 3-frame gap at 30 fps
 #define MB_CLEAR_RGBA 1.0, 1.0, 1.0, 0.0
 #define MB_TRAIL_ALPHA 0           // 1: capture and output premultiplied RGBA for transparent export
+#define MB_TRANSLUCENT_MOTION 0   // 1: blur ordinary alpha materials on their own depth layer
 #define MB_DEBUG 0                 // 0: result; 1: source; 2: motion; 3: depth; 4: coverage; 5: position space
 #define MB_EXTEND_FOREGROUND 1     // 0: use the P0 within-surface blur
 #define MB_LAYERED_TRAIL 0         // 1: retain a second trail direction at a distinct depth
