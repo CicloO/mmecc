@@ -293,11 +293,37 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
     float2 direction = neighbor.rg / streakLength;
     float reach = 0.5 * streakLength + 0.75;
     int taps = (int)min(StreakTapBudget(64.0), ceil(2.0 * reach));
+#if MB_DENSE_FOREGROUND_TAPS
+    bool horizontal = abs(direction.x) >= abs(direction.y);
+    float rayAxis = horizontal ? direction.x : direction.y;
+    taps = max(taps, (int)ceil(2.0 * reach * abs(rayAxis)));
+#endif
     float spacing = 2.0 * reach / taps;
     float2 centerPixel = uv * ScreenSize;
     float4 exposure = 0.0;
+#if MB_DENSE_FOREGROUND_TAPS
+    int firstTap = 0;
+    int lastTap = taps;
+    if (taps > MaxLoopIterations) {
+        // Only large searches need clipping and batching. Keep the original
+        // tap grid and let the per-tap bounds check handle the other axis.
+        float axisCenter = horizontal ? centerPixel.x : centerPixel.y;
+        float axisSize = horizontal ? ScreenSize.x : ScreenSize.y;
+        float2 edgeOffsets = (float2(0.0, axisSize) - axisCenter) / rayAxis;
+        float start = min(edgeOffsets.x, edgeOffsets.y);
+        float finish = max(edgeOffsets.x, edgeOffsets.y);
+        firstTap = max(0, (int)floor((start + reach) / spacing - 0.5));
+        lastTap = min(taps, (int)ceil((finish + reach) / spacing + 0.5));
+    }
+    [fastopt]
+    for (int first = firstTap; first < lastTap; first += MaxLoopIterations) {
+        int end = min(first + MaxLoopIterations, lastTap);
+    [fastopt]
+    for (int tap = first; tap < end; ++tap) {
+#else
     [fastopt]
     for (int tap = 0; tap < taps; ++tap) {
+#endif
         float offset = (tap + 0.5) * spacing - reach;
         float2 samplePixel = floor(centerPixel + offset * direction) + 0.5;
         if (any(samplePixel < 0.0) || any(samplePixel >= ScreenSize)) {
@@ -343,6 +369,9 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
 #endif
         }
     }
+#if MB_DENSE_FOREGROUND_TAPS
+    }
+#endif
 #if MB_USE_TRAIL_ALPHA
     // Clamp coverage for overlapping taps and keep their average color.
     exposure /= max(1.0, exposure.a);

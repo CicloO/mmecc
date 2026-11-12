@@ -49,6 +49,8 @@ $cases = @(
     @{ Name = 'noauto'; Set = @{ MB_AUTO_MODEL_MOTION = '0' } },
     @{ Name = 'nocutprobe'; Set = @{ MB_CUT_SCREEN_HEIGHT = '0.0' } },
     @{ Name = 'layered'; Set = @{ MB_LAYERED_TRAIL = '1' } },
+    @{ Name = 'densetaps'; Set = @{ MB_DENSE_FOREGROUND_TAPS = '1' } },
+    @{ Name = 'denselayered'; Set = @{ MB_DENSE_FOREGROUND_TAPS = '1'; MB_LAYERED_TRAIL = '1'; MB_TRAIL_ALPHA = '1' } },
     @{ Name = 'worldhistory'; Set = @{ MB_KEEP_OBJECT_MOTION_ON_CUT = '1' } },
     @{ Name = 'worldp0'; Set = @{ MB_KEEP_OBJECT_MOTION_ON_CUT = '1'; MB_EXTEND_FOREGROUND = '0' } },
     @{ Name = 'worlddbg2'; Set = @{ MB_KEEP_OBJECT_MOTION_ON_CUT = '1'; MB_DEBUG = '2' } },

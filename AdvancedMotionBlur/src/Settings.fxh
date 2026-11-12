@@ -16,6 +16,7 @@
 #define MB_DEBUG 0                 // 0: result; 1: source; 2: motion; 3: depth; 4: coverage; 5: position space
 #define MB_EXTEND_FOREGROUND 1     // 0: use the P0 within-surface blur
 #define MB_LAYERED_TRAIL 0         // 1: retain a second trail direction at a distinct depth
+#define MB_DENSE_FOREGROUND_TAPS 0 // 1: long trails sample every pixel along their dominant axis
 #define MB_TRAIL_SPREAD 0.35       // Outer trail width grows by this per px of distance; 0: 0.2.0
 #define MB_LINEAR_COLOR 1          // 0: point-sampled trail colour (0.2.0)
 #define MB_EDGE_BACKGROUND 1     // 0: inner side of moving silhouettes stays opaque (0.2.0)
