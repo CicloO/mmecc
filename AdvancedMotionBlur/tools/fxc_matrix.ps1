@@ -14,6 +14,14 @@ param(
 $fxc = 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\fxc.exe'
 $settings = Get-Content (Join-Path $Src 'Settings.fxh') -Raw
 $settings = [regex]::Replace($settings, '(?m)^#define MB_DEBUG\s+\S+', '#define MB_DEBUG 0')
+$review = @{
+    MB_ACCESSORY_MOTION = '1'
+    MB_KEEP_OBJECT_MOTION_ON_CUT = '1'
+    MB_LAYERED_TRAIL = '1'
+    MB_DENSE_FOREGROUND_TAPS = '1'
+    MB_TRANSLUCENT_MOTION = '1'
+    MB_LINEAR_LIGHT = '1'
+}
 $cases = @(
     @{ Name = 'default'; Set = @{} },
     @{ Name = 'height0'; Set = @{ MB_SCALE_STREAK_WITH_HEIGHT = '0' } },
@@ -35,6 +43,8 @@ $cases = @(
     @{ Name = 'linearlightlayered'; Set = @{ MB_LINEAR_LIGHT = '1'; MB_LAYERED_TRAIL = '1' } },
     @{ Name = 'linearlightalpha'; Set = @{ MB_LINEAR_LIGHT = '1'; MB_TRAIL_ALPHA = '1'; MB_QUALITY = '3' } },
     @{ Name = 'linearlightcombined'; Set = @{ MB_LINEAR_LIGHT = '1'; MB_TRAIL_ALPHA = '1'; MB_TRANSLUCENT_MOTION = '1'; MB_LAYERED_TRAIL = '1'; MB_DENSE_FOREGROUND_TAPS = '1' } },
+    @{ Name = 'reviewscene'; Set = $review + @{ MB_TRAIL_ALPHA = '0' } },
+    @{ Name = 'reviewrgba'; Set = $review + @{ MB_TRAIL_ALPHA = '1' } },
     @{ Name = 'rigid'; Set = @{ MB_ACCESSORY_MOTION = '1' } },
     @{ Name = 'rigidworld'; Set = @{ MB_ACCESSORY_MOTION = '1'; MB_KEEP_OBJECT_MOTION_ON_CUT = '1' } },
     @{ Name = 'rigiddebug5'; Set = @{ MB_ACCESSORY_MOTION = '1'; MB_DEBUG = '5' } },

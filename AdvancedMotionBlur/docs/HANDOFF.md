@@ -62,6 +62,8 @@ python -I tools/d3dx_compile_time.py <临时目录>/amb-fxc-matrix/default/Advan
 
 ## 5. 实机对照（由用户在 MMD 里跑，Codex 记“未运行”）
 
+当前候选可以在同一目录换配置复查，见 [同版本组合与实机对照](VALIDATION.md#同版本组合与实机对照)。
+
 - 工程：`H:\Coding\mmecc\AdvancedMotionBlur\测试基线.pmm`（本地）。导出范围 500–900，从 500 起连续导出，500–504 是预卷。分段见 VALIDATION“阶段 0 基线工程”。
 - 对照帧：515、525、531、536、539、590、645、700、751、815、831、860。
 - 3L 对照：`测试基线_3L.pmm`，附件 Si 为 5（用户设定，不是默认）。

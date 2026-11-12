@@ -1,6 +1,7 @@
 #if MB_USE_LINEAR_LIGHT
 float3 SRGBToLinear(float3 srgb)
 {
+    srgb = max(srgb, 0.0);
     float3 low = srgb / 12.92;
     float3 high = pow((srgb + 0.055) / 1.055, 2.4);
     return lerp(low, high, step(0.04045, srgb));
