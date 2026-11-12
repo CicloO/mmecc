@@ -287,6 +287,13 @@ Soboro 的发行说明记载 2.2 侧重修正与视频用途，3.0 增加静画�
 
 以上原生用例待用户实测。组合通过后再逐项记录默认开关验收结果。
 
+### 5763069 整合试用版
+
+- `dist/review-5763069-combined` 集中提供同一版源码、同设置的 Scene 预编译附件和九份源码配置。核对 Default／Layered、Default／CutProbes、CutProbes／CutProbesWorld、Scene／SceneJitter、Scene／SceneDither、Scene／RGBA 均只差指定开关。使用步骤见 [实机对照](MME-ACCEPTANCE.md)。
+- FXC 75 组共 300 次通过，含启用补充切镜探针的 Scene、SceneJitter、SceneDither、RGBA 及两种抖动同时开启的 RGBA。1920×1080 和 3840×1728 的 D3D9 回读确认采样抖动和输出抖动各自改变重建画面，速度场和分块方向一致，加法材质保护和透明外拖尾通过。Scene 的输出抖动各通道最多相差一个 8 位色阶，Alpha 一致。
+- 同分辨率下，Default、Scene、RGBA 的源码和预编译效果输出、速度及分块回读一致。用实际交付的两个 Scene 目录再跑 `AnalyzeCamera`，30／60 fps 的近景切镜、持续运镜和手动覆盖结果相同，1080p 从自动判定到重建的速度场和最终输出逐像素一致。预编译 Scene 保留了 MME 脚本、映射注释和控制器参数，运行时改变 `Streak -` 后立即回到原色。
+- `D3DXCreateEffectFromFileW` 的后台 Scene 创建耗时约 2.89–2.91 秒，预编译约 3.6–4.2 毫秒。实际 MMD 中的载入、映射、控制器绑定和成片仍待实机核对。
+
 ## 预编译试用
 
 - 复用 `tools/d3dx_compile_time.py` 的旧版编译器调用生成新目录。在 Default、Scene、RGBA 三套设置下只替换主效果、深度效果和附件矩阵效果的三份 `.fx`。模型效果、头文件、附件和控制器保持原始字节。现有输出、二进制输入和用 `TEXCOORD7` 替换模型索引的测试副本被拒绝。

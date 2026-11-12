@@ -16,6 +16,7 @@ $settings = Get-Content (Join-Path $Src 'Settings.fxh') -Raw
 $settings = [regex]::Replace($settings, '(?m)^#define MB_DEBUG\s+\S+', '#define MB_DEBUG 0')
 $review = @{
     MB_ACCESSORY_MOTION = '1'
+    MB_CUT_FOREGROUND_PROBES = '1'
     MB_KEEP_OBJECT_MOTION_ON_CUT = '1'
     MB_LAYERED_TRAIL = '1'
     MB_DENSE_FOREGROUND_TAPS = '1'
@@ -56,6 +57,8 @@ $cases = @(
     @{ Name = 'jitterdense'; Set = @{ MB_SAMPLE_JITTER = '1'; MB_DENSE_FOREGROUND_TAPS = '1' } },
     @{ Name = 'jittercombined'; Set = $review + @{ MB_SAMPLE_JITTER = '1'; MB_TRAIL_ALPHA = '1'; MB_OUTPUT_DITHER = '1' } },
     @{ Name = 'reviewscene'; Set = $review + @{ MB_TRAIL_ALPHA = '0' } },
+    @{ Name = 'reviewscenejitter'; Set = $review + @{ MB_SAMPLE_JITTER = '1' } },
+    @{ Name = 'reviewscenedither'; Set = $review + @{ MB_OUTPUT_DITHER = '1' } },
     @{ Name = 'reviewrgba'; Set = $review + @{ MB_TRAIL_ALPHA = '1' } },
     @{ Name = 'rigid'; Set = @{ MB_ACCESSORY_MOTION = '1' } },
     @{ Name = 'rigidworld'; Set = @{ MB_ACCESSORY_MOTION = '1'; MB_KEEP_OBJECT_MOTION_ON_CUT = '1' } },
@@ -83,7 +86,7 @@ $cases = @(
     @{ Name = 'noauto'; Set = @{ MB_AUTO_MODEL_MOTION = '0' } },
     @{ Name = 'nocutprobe'; Set = @{ MB_CUT_SCREEN_HEIGHT = '0.0' } },
     @{ Name = 'cutforeground'; Set = @{ MB_CUT_FOREGROUND_PROBES = '1' } },
-    @{ Name = 'cutforegroundworld'; Set = $review + @{ MB_CUT_FOREGROUND_PROBES = '1'; MB_TRAIL_ALPHA = '1' } },
+    @{ Name = 'cutforegroundworld'; Set = @{ MB_CUT_FOREGROUND_PROBES = '1'; MB_KEEP_OBJECT_MOTION_ON_CUT = '1' } },
     @{ Name = 'cutforegrounddisabled'; Set = @{ MB_CUT_FOREGROUND_PROBES = '1'; MB_CUT_SCREEN_HEIGHT = '0.0' } },
     @{ Name = 'layered'; Set = @{ MB_LAYERED_TRAIL = '1' } },
     @{ Name = 'densetaps'; Set = @{ MB_DENSE_FOREGROUND_TAPS = '1' } },
