@@ -145,8 +145,18 @@ float4 AnalyzeCameraFrame() : COLOR0
 {
     float4 timing = PreviousCamera(4.0);
     float dt = Timeline - timing.x;
-    if (timing.w != CameraHistoryTag || any(abs(timing.yz - ScreenSize) > 0.5)
-        || !(dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP)) {
+    if (timing.w != CameraHistoryTag || any(abs(timing.yz - ScreenSize) > 0.5)) {
+        return 0.0;
+    }
+    if (!(dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP)) {
+        // A redraw of the same camera frame has no exposure, but its most
+        // recent measured speed still describes the preceding interval.
+        if (dt == 0.0 && all(ViewProjection[0] == PreviousCamera(0.0))
+            && all(ViewProjection[1] == PreviousCamera(1.0))
+            && all(ViewProjection[2] == PreviousCamera(2.0))
+            && all(ViewProjection[3] == PreviousCamera(3.0))) {
+            return float4(0.0, 0.0, PreviousCamera(7.0).x, 0.0);
+        }
         return 0.0;
     }
 
