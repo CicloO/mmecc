@@ -169,6 +169,13 @@ float4 BuildTileMax(float2 quadUV : TEXCOORD0) : COLOR0
 }
 
 #if MB_LAYERED_TRAIL
+bool PreferAlternate(float3 motion, float lengthSquared, float4 best)
+{
+    // At equal speed, an opaque backing plane must not displace a nearer
+    // surface whose trail is visible across it.
+    return lengthSquared > best.a || (lengthSquared == best.a && motion.b < best.b);
+}
+
 // The primary depth is final before ranking alternates, so a later primary
 // cannot invalidate the alternate and hide an earlier eligible sample.
 float4 BuildTileAlternate(float2 quadUV : TEXCOORD0) : COLOR0
@@ -194,7 +201,8 @@ float4 BuildTileAlternate(float2 quadUV : TEXCOORD0) : COLOR0
             float2 uv = (first + float2(i, j) + 0.5) / ScreenSize;
             float4 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
             float lengthSquared = dot(motion.rg, motion.rg);
-            if (CanExtendTrail(motion.a) && lengthSquared >= MinStreak() * MinStreak() && lengthSquared > best.a &&
+            if (CanExtendTrail(motion.a) && lengthSquared >= MinStreak() * MinStreak() &&
+                PreferAlternate(motion.rgb, lengthSquared, best) &&
                 abs(motion.b - primary.a) > 2.0 * DepthTolerance) {
                 best = float4(motion.rgb, lengthSquared);
             }
@@ -211,7 +219,14 @@ void AccumulateNeighbor(inout TileReduction best, float4 sampleMotion, float2 ga
     float reach = 0.5 * sqrt(lengthSquared) + 1.0;
     if (dot(gap, gap) <= reach * reach) {
 #if MB_LAYERED_TRAIL
-        if (alternate && abs(sampleMotion.a - primaryDepth) <= 2.0 * DepthTolerance) return;
+        if (alternate) {
+            if (abs(sampleMotion.a - primaryDepth) > 2.0 * DepthTolerance &&
+                lengthSquared >= MinStreak() * MinStreak() &&
+                PreferAlternate(sampleMotion.rga, lengthSquared, best.primary)) {
+                best.primary = float4(sampleMotion.rga, lengthSquared);
+            }
+            return;
+        }
         AccumulateTile(best, sampleMotion.rga, sampleMotion.b, lengthSquared);
 #else
         AccumulateTile(best, sampleMotion.rgb, sampleMotion.b, lengthSquared);
