@@ -274,6 +274,34 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 #endif
 }
 
+#if MB_OUTPUT_DITHER && MB_DEBUG == 0
+float Bayer2(float2 cell)
+{
+    return 2.0 * cell.x + 3.0 * cell.y - 4.0 * cell.x * cell.y;
+}
+#endif
+
+float4 FinishReconstruction(float4 filtered, float4 original, float2 uv)
+{
+#if MB_OUTPUT_DITHER && MB_DEBUG == 0
+    [branch]
+    if (any(filtered != original)) {
+        // A fixed 4x4 Bayer pattern offsets nearest rounding by less than half an LSB.
+        float2 pixel = floor(uv * ScreenSize);
+        float2 block = floor(pixel * 0.5);
+        float2 low = pixel - 2.0 * block;
+        float2 high = block - 2.0 * floor(block * 0.5);
+        float threshold = (4.0 * Bayer2(low) + Bayer2(high) + 0.5) / 16.0;
+#if MB_USE_TRAIL_ALPHA
+        filtered = floor(saturate(filtered) * 255.0 + threshold) / 255.0;
+#else
+        filtered.rgb = floor(saturate(filtered.rgb) * 255.0 + threshold) / 255.0;
+#endif
+    }
+#endif
+    return filtered;
+}
+
 float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
 {
     // MME can draw to a viewport whose origin is inside the MMD window.
@@ -283,8 +311,8 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     return color;
 #elif MB_USE_FOREGROUND
     float4 geometry = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
-    color = BlurSurface(uv, color, geometry, geometry.rg);
-    return ExtendForeground(uv, color, geometry);
+    float4 blurred = BlurSurface(uv, color, geometry, geometry.rg);
+    return FinishReconstruction(ExtendForeground(uv, blurred, geometry), color, uv);
 #else
     float4 geometry = tex2Dlod(GeometrySampler, float4(uv, 0.0, 0.0));
 #if MB_DEBUG == 3
@@ -314,7 +342,7 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     return float4(0.5 + 0.5 * clamp(streak / limit, -1.0, 1.0),
                   saturate(length(streak) / limit), 1.0);
 #else
-    return BlurSurface(uv, color, geometry, streak);
+    return FinishReconstruction(BlurSurface(uv, color, geometry, streak), color, uv);
 #endif
 #endif
 #endif
