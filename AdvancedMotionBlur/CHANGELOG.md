@@ -21,6 +21,7 @@
 - 修正模型漏记一帧后重新出现时的错误拖影。裁剪坐标顶点历史与相机间隔匹配才使用模型位移，否则回到镜头速度。
 - 新增 `MB_DENSE_FOREGROUND_TAPS` 候选。长拖影在主轴上补足采样，减少单像素细节的断点。
 - 新增 `MB_TRANSLUCENT_MOTION` 候选。普通 Alpha 材质沿自身或镜头速度在同深度内模糊，加法材质保留原色。
+- 新增 `MB_LINEAR_LIGHT` 候选。轮廓内外的 sRGB 颜色转为线性光后累加，再转回 sRGB。
 
 - 新增速度死区 `MB_SPEED_THRESHOLD`：拖影先减去该长度，慢的部分保持清晰，只模糊快速动作。控制器"其他"栏新增单个表情 `Threshold`（最多再加 16 px）。
 - 默认效果加强：快门角保持 180°，`MB_MOTION_SCALE` 1.0 → 1.3，`MB_MAX_STREAK` 48 → 64 px，`MB_SPEED_THRESHOLD` 3 px。恢复 0.2.0 观感的设置写在参数手册。

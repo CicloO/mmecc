@@ -19,6 +19,8 @@ float StreakPixelScale()
 
 #define MB_USE_FOREGROUND (MB_EXTEND_FOREGROUND && MB_DEBUG == 0)
 #define MB_USE_TRAIL_ALPHA (MB_TRAIL_ALPHA && MB_DEBUG == 0)
+#define MB_USE_LINEAR_LIGHT (MB_LINEAR_LIGHT && MB_DEBUG == 0)
+#include "LinearLight.fxh"
 
 float Script : STANDARDSGLOBAL <
     string ScriptOutput = "color";
@@ -223,6 +225,7 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
     // Keep the centre's share of the total the same as the old 16-tap kernel
     // (2/16 for surfaces, 0.75/16 for outlines).
     float weightSum = taps * (outline ? 0.046875 : 0.125);
+    color = DecodeTrailColor(color);
 #if MB_USE_TRAIL_ALPHA
     float4 sum = color * weightSum;
 #else
@@ -256,18 +259,18 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 #if MB_USE_TRAIL_ALPHA
         // Capture already stores premultiplied color, so average RGBA with the same weights.
         float weight = inside * TapWeight(geometry, tapGeometry, 1.0);
-        sum += tapColor * weight;
+        sum += DecodeTrailColor(tapColor) * weight;
 #else
         float alpha = tapGeometry.a > 3.5 && !IsAdditive(tapGeometry.a) ? 1.0 : tapColor.a;
         float weight = inside * TapWeight(geometry, tapGeometry, alpha);
-        sum += tapColor.rgb * weight;
+        sum += DecodeTrailColor(tapColor).rgb * weight;
 #endif
         weightSum += weight;
     }
 #if MB_USE_TRAIL_ALPHA
-    return sum / weightSum;
+    return EncodeTrailColor(sum / weightSum);
 #else
-    return float4(sum / weightSum, color.a);
+    return EncodeTrailColor(float4(sum / weightSum, color.a));
 #endif
 }
 
