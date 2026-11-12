@@ -140,9 +140,15 @@ P1 轮廓外拖尾和描边修正不在控制器里。要对照时修改 `MB_EXT
 
 ## 预编译、载入与渲染速度
 
-当前版本由 MME 在载入时编译 `.fx`。本地用 Windows SDK FXC 的 `/T fx_2_0` 实测，主效果和 `DepthVelocity.fx` 能生成 `.fxo`，`MotionGeometry.fx` 则因 MME 专用的顶点输入语义 `_INDEX` 被独立 FXC 拒绝（X4502）。临时改用 `TEXCOORD7` 可以验证编译，但真正的顶点索引绑定仍要由 MME 完成。整套预编译产物的 MME 加载兼容性尚未验证。
+源码版由 MME 在载入时编译。在 Windows 上可用同版 `d3dx9_43.dll` 生成预编译试用目录。先在源码目录设好 `Settings.fxh`，再从项目根目录运行：
 
-如果 MME 能直接接受等价的二进制效果，预编译能省下载入时的源码编译步骤。辅助效果映射、模型历史缓冲和渲染目标分配仍有各自的耗时。本机一次独立 FXC 检查中，主效果约 0.4 秒，`DepthVelocity.fx` 约 0.02 秒。这些数字只包含独立编译，不能用来判断 MME 里长时间卡顿的主要来源。
+```powershell
+python -I tools/d3dx_compile_time.py --package-from src --out dist/preview-precompiled
+```
+
+在新目录载入 `AdvancedMotionBlur.x`，并将 `GeometryData` 的显式映射指向同一目录。主效果、`DepthVelocity.fx` 和 `RigidMotion.fx` 以原文件名保存二进制。`MotionGeometry.fx` 和头文件保留源码，MME 用其中的 `_INDEX` 绑定模型顶点。修改编译设置后，从源码重新生成预编译目录。PMX 控制器与附件 Si 仍是运行时参数。
+
+离屏 D3DX 加载预编译主效果约 2–5 毫秒，默认源码约 1.07 秒，Scene 源码约 2.48 秒。实机总载入还包含辅助效果映射、模型历史缓冲和渲染目标分配。MME 加载二进制与 `_INDEX` 源码组合仍待实测。
 
 同一份着色器编译为相同的 GPU 指令时，提前编译基本不会提高逐帧渲染速度。实际影响渲染开销的是采样数、渲染 pass、输出像素数和顶点历史。`MB_QUALITY 0` 在短拖影上采样最少，`3` 固定 16 个，关闭 `MB_EXTEND_FOREGROUND` 会去掉 P1 的新增 pass，只给需要角色拖影的对象开启 `MotionGeometry.fx` 可减少顶点历史工作量。P1 单张全尺寸 RGBA16F 速度场在 1920×1080 约占 15.8 MiB，在 3840×1728 约占 50.6 MiB，另外还有小尺寸分块缓冲。
 
