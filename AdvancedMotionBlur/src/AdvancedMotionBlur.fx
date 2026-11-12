@@ -158,6 +158,20 @@ float StreakTapBudget(float referenceTaps)
 
 static const float DepthTolerance = max(MB_DEPTH_TOLERANCE, 0.0001);
 
+float TrailTapPhase(float2 uv)
+{
+#if MB_SAMPLE_JITTER && MB_DEBUG == 0
+    // Use a stable screen-space phase for all taps at a pixel. Keeping their
+    // spacing also keeps dense outer trails from skipping pixels.
+    float2 pixel = floor(uv * ScreenSize);
+    float3 phase = frac(pixel.xyx * 0.1031);
+    phase += dot(phase, phase.yzx + 33.33);
+    return frac((phase.x + phase.y) * phase.z);
+#else
+    return 0.5;
+#endif
+}
+
 #if MB_USE_FOREGROUND
 #include "Foreground.fxh"
 #endif
@@ -232,10 +246,11 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
     float3 sum = color.rgb * weightSum;
 #endif
     float2 stepUV = streak / ScreenSize;
+    float phase = TrailTapPhase(uv);
     // The tap budget varies with viewport height in the legacy effect compiler.
     [fastopt]
     for (int tap = 0; tap < taps; ++tap) {
-        float t = (tap + 0.5) / taps - 0.5;
+        float t = (tap + phase) / taps - 0.5;
         float2 tapUV = uv + t * stepUV;
         float inside = all(tapUV >= 0.0) && all(tapUV < 1.0);
         // Both buffers carry the same log depth and coverage in B/A.

@@ -334,6 +334,7 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
 #endif
     float spacing = 2.0 * reach / taps;
     float2 centerPixel = uv * ScreenSize;
+    float phase = TrailTapPhase(uv);
     float4 exposure = 0.0;
 #if MB_DENSE_FOREGROUND_TAPS
     int firstTap = 0;
@@ -346,8 +347,8 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
         float2 edgeOffsets = (float2(0.0, axisSize) - axisCenter) / rayAxis;
         float start = min(edgeOffsets.x, edgeOffsets.y);
         float finish = max(edgeOffsets.x, edgeOffsets.y);
-        firstTap = max(0, (int)floor((start + reach) / spacing - 0.5));
-        lastTap = min(taps, (int)ceil((finish + reach) / spacing + 0.5));
+        firstTap = max(0, (int)floor((start + reach) / spacing - phase));
+        lastTap = min(taps, (int)ceil((finish + reach) / spacing + (1.0 - phase)));
     }
     [fastopt]
     for (int first = firstTap; first < lastTap; first += MaxLoopIterations) {
@@ -358,7 +359,7 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
     [fastopt]
     for (int tap = 0; tap < taps; ++tap) {
 #endif
-        float offset = (tap + 0.5) * spacing - reach;
+        float offset = (tap + phase) * spacing - reach;
         float2 samplePixel = floor(centerPixel + offset * direction) + 0.5;
         if (any(samplePixel < 0.0) || any(samplePixel >= ScreenSize)) {
             continue;
