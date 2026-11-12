@@ -88,6 +88,12 @@ struct TileReduction {
     float nearest;
 };
 
+#if MB_LAYERED_TRAIL
+// In TileRows only, this out-of-range log depth means every moving sample
+// has the primary's depth. Channel A then carries both depth bounds.
+static const float UniformRowDepth = 256.0;
+#endif
+
 float4 FinishTile(TileReduction reduction)
 {
 #if MB_LAYERED_TRAIL
@@ -120,6 +126,9 @@ float4 BuildTileRows(float2 quadUV : TEXCOORD0) : COLOR0
     float2 rasterSize = TileRasterSize(quadUV);
     TileReduction best = (TileReduction)0;
     best.nearest = 128.0;
+#if MB_LAYERED_TRAIL
+    float farthest = -128.0;
+#endif
     [branch]
     if (!FrameHasExposure()) {
         return FinishTile(best);
@@ -134,9 +143,21 @@ float4 BuildTileRows(float2 quadUV : TEXCOORD0) : COLOR0
         float2 uv = (float2(first + i, tileRow.y) + 0.5) / ScreenSize;
         float4 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
         if (CanExtendTrail(motion.a)) {
-            AccumulateTile(best, motion.rgb, motion.b, dot(motion.rg, motion.rg));
+            float lengthSquared = dot(motion.rg, motion.rg);
+            AccumulateTile(best, motion.rgb, motion.b, lengthSquared);
+#if MB_LAYERED_TRAIL
+            if (lengthSquared >= MinStreak() * MinStreak()) {
+                farthest = max(farthest, motion.b);
+            }
+#endif
         }
     }
+#if MB_LAYERED_TRAIL
+    // Retain the original nearest value for rows with signed zero depth.
+    if (best.nearest == farthest && best.nearest != 0.0) {
+        best.nearest = UniformRowDepth;
+    }
+#endif
     return FinishTile(best);
 }
 
@@ -160,7 +181,8 @@ float4 BuildTileMax(float2 quadUV : TEXCOORD0) : COLOR0
         float2 uv = (float2(tile.x, first + j) + 0.5) / float2(rasterSize.x, ScreenSize.y);
         float4 motion = tex2Dlod(TileRowsSampler, float4(uv, 0.0, 0.0));
 #if MB_LAYERED_TRAIL
-        AccumulateTile(best, motion.rga, motion.b, dot(motion.rg, motion.rg));
+        float nearest = motion.b == UniformRowDepth ? motion.a : motion.b;
+        AccumulateTile(best, motion.rga, nearest, dot(motion.rg, motion.rg));
 #else
         AccumulateTile(best, motion.rgb, motion.b, dot(motion.rg, motion.rg));
 #endif
@@ -192,16 +214,33 @@ float4 BuildTileAlternate(float2 quadUV : TEXCOORD0) : COLOR0
     float2 first = floor(tile * tileSpan + 0.5);
     float2 count = min(ScreenSize, floor((tile + 1.0) * tileSpan + 0.5)) - first;
     float4 best = 0.0;
+    float minLengthSquared = MinStreak() * MinStreak();
     [fastopt]
     for (int j = 0; j < MaxTileSpan; ++j) {
         if (j >= count.y) break;
+        float2 rowUV = float2(tileUV.x, (first.y + j + 0.5) / ScreenSize.y);
+        float4 row = tex2Dlod(TileRowsSampler, float4(rowUV, 0.0, 0.0));
+        float rowLengthSquared = dot(row.rg, row.rg);
+        bool oneDepth = row.b == UniformRowDepth;
+        float nearest = oneDepth ? row.a : row.b;
+        // A sample in this row cannot beat both of these bounds.
+        if (rowLengthSquared < minLengthSquared || !PreferAlternate(float3(row.rg, nearest), rowLengthSquared, best)) {
+            continue;
+        }
+        bool depthSeparated = abs(row.a - primary.a) > 2.0 * DepthTolerance;
+        // At one depth, all samples are eligible or all are excluded. The
+        // fastest sample also wins any tie if it has the nearest depth.
+        if (oneDepth || (row.a == nearest && depthSeparated)) {
+            if (depthSeparated) best = float4(row.rga, rowLengthSquared);
+            continue;
+        }
         [fastopt]
         for (int i = 0; i < MaxTileSpan; ++i) {
             if (i >= count.x) break;
             float2 uv = (first + float2(i, j) + 0.5) / ScreenSize;
             float4 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
             float lengthSquared = dot(motion.rg, motion.rg);
-            if (CanExtendTrail(motion.a) && lengthSquared >= MinStreak() * MinStreak() &&
+            if (CanExtendTrail(motion.a) && lengthSquared >= minLengthSquared &&
                 PreferAlternate(motion.rgb, lengthSquared, best) &&
                 abs(motion.b - primary.a) > 2.0 * DepthTolerance) {
                 best = float4(motion.rgb, lengthSquared);
