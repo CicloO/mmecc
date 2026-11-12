@@ -62,8 +62,6 @@ python -I tools/d3dx_compile_time.py <临时目录>/amb-fxc-matrix/default/Advan
 
 ## 5. 实机对照（由用户在 MMD 里跑，Codex 记“未运行”）
 
-当前候选可以在同一目录换配置复查，见 [实机对照步骤](MME-ACCEPTANCE.md) 和 [同版本组合与实机对照](VALIDATION.md#同版本组合与实机对照)。
-
 - 工程：`H:\Coding\mmecc\AdvancedMotionBlur\测试基线.pmm`（本地）。导出范围 500–900，从 500 起连续导出，500–504 是预卷。分段见 VALIDATION“阶段 0 基线工程”。
 - 对照帧：515、525、531、536、539、590、645、700、751、815、831、860。
 - 3L 对照：`测试基线_3L.pmm`，附件 Si 为 5（用户设定，不是默认）。
@@ -82,3 +80,11 @@ python -I tools/d3dx_compile_time.py <临时目录>/amb-fxc-matrix/default/Advan
 ## 7. 交回时请写
 
 按 `CLAUDE.md`：每项的改动摘要、检查命令与结果、未完成项、需要用户在 MMD 里看的帧，写进本文末尾或 VALIDATION。
+
+## 8. 验收结果（Claude，2026-11-12）
+
+Codex 交回 36 个提交后，在 MMD 实机对照并整理，结果见 VALIDATION“2026-11-12 实机验收与整理”。要点：
+
+- 采样抖动改为默认；补充切镜探针常开，`MB_CUT_SCREEN_HEIGHT` 0.05；`MB_KEEP_OBJECT_MOTION_ON_CUT` 默认开。上面第 1 节“默认观感不变”的原则因此不再成立，以新默认为基准。
+- 删除双层拖尾、长拖影密采样、线性光、输出抖动、矩形图集、`MB_DEBUG 5`、D3DX 预编译打包。
+- 未解决：带场景右手旁的清晰方块（分块单方向竞争，双层无效）；整理后版本的整段实机导出。

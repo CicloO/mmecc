@@ -19,8 +19,6 @@ float StreakPixelScale()
 
 #define MB_USE_FOREGROUND (MB_EXTEND_FOREGROUND && MB_DEBUG == 0)
 #define MB_USE_TRAIL_ALPHA (MB_TRAIL_ALPHA && MB_DEBUG == 0)
-#define MB_USE_LINEAR_LIGHT (MB_LINEAR_LIGHT && MB_DEBUG == 0)
-#include "LinearLight.fxh"
 
 float Script : STANDARDSGLOBAL <
     string ScriptOutput = "color";
@@ -239,7 +237,6 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
     // Keep the centre's share of the total the same as the old 16-tap kernel
     // (2/16 for surfaces, 0.75/16 for outlines).
     float weightSum = taps * (outline ? 0.046875 : 0.125);
-    color = DecodeTrailColor(color);
 #if MB_USE_TRAIL_ALPHA
     float4 sum = color * weightSum;
 #else
@@ -274,47 +271,19 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 #if MB_USE_TRAIL_ALPHA
         // Capture already stores premultiplied color, so average RGBA with the same weights.
         float weight = inside * TapWeight(geometry, tapGeometry, 1.0);
-        sum += DecodeTrailColor(tapColor) * weight;
+        sum += tapColor * weight;
 #else
         float alpha = tapGeometry.a > 3.5 && !IsAdditive(tapGeometry.a) ? 1.0 : tapColor.a;
         float weight = inside * TapWeight(geometry, tapGeometry, alpha);
-        sum += DecodeTrailColor(tapColor).rgb * weight;
+        sum += tapColor.rgb * weight;
 #endif
         weightSum += weight;
     }
 #if MB_USE_TRAIL_ALPHA
-    return EncodeTrailColor(sum / weightSum);
+    return sum / weightSum;
 #else
-    return EncodeTrailColor(float4(sum / weightSum, color.a));
+    return float4(sum / weightSum, color.a);
 #endif
-}
-
-#if MB_OUTPUT_DITHER && MB_DEBUG == 0
-float Bayer2(float2 cell)
-{
-    return 2.0 * cell.x + 3.0 * cell.y - 4.0 * cell.x * cell.y;
-}
-#endif
-
-float4 FinishReconstruction(float4 filtered, float4 original, float2 uv)
-{
-#if MB_OUTPUT_DITHER && MB_DEBUG == 0
-    [branch]
-    if (any(filtered != original)) {
-        // A fixed 4x4 Bayer pattern offsets nearest rounding by less than half an LSB.
-        float2 pixel = floor(uv * ScreenSize);
-        float2 block = floor(pixel * 0.5);
-        float2 low = pixel - 2.0 * block;
-        float2 high = block - 2.0 * floor(block * 0.5);
-        float threshold = (4.0 * Bayer2(low) + Bayer2(high) + 0.5) / 16.0;
-#if MB_USE_TRAIL_ALPHA
-        filtered = floor(saturate(filtered) * 255.0 + threshold) / 255.0;
-#else
-        filtered.rgb = floor(saturate(filtered.rgb) * 255.0 + threshold) / 255.0;
-#endif
-    }
-#endif
-    return filtered;
 }
 
 float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
@@ -327,7 +296,7 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
 #elif MB_USE_FOREGROUND
     float4 geometry = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
     float4 blurred = BlurSurface(uv, color, geometry, geometry.rg);
-    return FinishReconstruction(ExtendForeground(uv, blurred, geometry), color, uv);
+    return ExtendForeground(uv, blurred, geometry);
 #else
     float4 geometry = tex2Dlod(GeometrySampler, float4(uv, 0.0, 0.0));
 #if MB_DEBUG == 3
@@ -342,13 +311,6 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     }
     bool modelMotion = HasModelMotion(geometry.a, CurrentCameraAnalysis().x);
     return float4(geometry.a > 2.5, modelMotion, geometry.a > 0.0 && geometry.a < 2.5 && !modelMotion, 1.0);
-#elif MB_DEBUG == 5
-    if (geometry.a < 4.5 || IsAdditive(geometry.a)) {
-        return float4(0.0, 0.0, 0.0, 1.0);
-    }
-    bool direct = geometry.r <= 0.05;
-    bool transformed = geometry.g <= 0.05;
-    return float4(!transformed, direct, transformed && !direct, 1.0);
 #else
     float4 camera = CurrentCameraAnalysis();
     float2 streak = ExposureStreak(quadUV, geometry, camera);
@@ -357,7 +319,7 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     return float4(0.5 + 0.5 * clamp(streak / limit, -1.0, 1.0),
                   saturate(length(streak) / limit), 1.0);
 #else
-    return FinishReconstruction(BlurSurface(uv, color, geometry, streak), color, uv);
+    return BlurSurface(uv, color, geometry, streak);
 #endif
 #endif
 #endif
@@ -391,22 +353,8 @@ technique AdvancedMotionBlur <
         "RenderColorTarget0=TileMax;"
         "RenderDepthStencilTarget=TileDepth;"
         "Pass=ReduceTiles;"
-#if MB_LAYERED_TRAIL
-        "RenderColorTarget0=TileAlternate;"
-        "Pass=StoreAlternateSize;"
-        "RenderColorTarget0=TileAlternateRows;"
-        "RenderDepthStencilTarget=TileRowsDepth;"
-        "Pass=ReduceAlternateRows;"
-        "RenderColorTarget0=TileAlternate;"
-        "RenderDepthStencilTarget=TileDepth;"
-        "Pass=ReduceTileAlternate;"
-#endif
         "RenderColorTarget0=NeighborMax;"
         "Pass=ReduceNeighbors;"
-#if MB_LAYERED_TRAIL
-        "RenderColorTarget0=NeighborAlternate;"
-        "Pass=ReduceNeighborAlternate;"
-#endif
 #endif
         "RenderColorTarget0=;"
         "RenderDepthStencilTarget=;"
@@ -441,30 +389,10 @@ technique AdvancedMotionBlur <
         MB_SCREEN_STATE
         PixelShader = compile ps_3_0 BuildTileMax();
     }
-#if MB_LAYERED_TRAIL
-    pass StoreAlternateSize < string Script = "Draw=Buffer;"; > {
-        MB_SCREEN_STATE
-        PixelShader = compile ps_3_0 StoreAlternateTileSize();
-    }
-    pass ReduceAlternateRows < string Script = "Draw=Buffer;"; > {
-        MB_SCREEN_STATE
-        PixelShader = compile ps_3_0 BuildTileAlternateRows();
-    }
-    pass ReduceTileAlternate < string Script = "Draw=Buffer;"; > {
-        MB_SCREEN_STATE
-        PixelShader = compile ps_3_0 BuildTileAlternate();
-    }
-#endif
     pass ReduceNeighbors < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
         PixelShader = compile ps_3_0 BuildNeighborMax();
     }
-#if MB_LAYERED_TRAIL
-    pass ReduceNeighborAlternate < string Script = "Draw=Buffer;"; > {
-        MB_SCREEN_STATE
-        PixelShader = compile ps_3_0 BuildNeighborAlternate();
-    }
-#endif
 #endif
     pass Output < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE

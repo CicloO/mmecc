@@ -108,7 +108,6 @@ float MedianScreenDisplacement()
     return valid == 5 ? samples[2] : (valid >= 3 ? samples[1] : samples[0]);
 }
 
-#if MB_CUT_FOREGROUND_PROBES
 float ForegroundScreenDisplacement(float previousZoom)
 {
     float4x4 previous = PreviousViewProjection();
@@ -139,7 +138,6 @@ float ForegroundScreenDisplacement(float previousZoom)
     }
     return second;
 }
-#endif
 
 float4 AnalyzeCameraFrame() : COLOR0
 {
@@ -167,7 +165,6 @@ float4 AnalyzeCameraFrame() : COLOR0
         || abs(previousUp.w - Projection[2][3]) > 0.5;
 
     float displacement = MB_CUT_SCREEN_HEIGHT > 0.0 ? MedianScreenDisplacement() : -1.0;
-#if MB_CUT_FOREGROUND_PROBES
     // A distant backdrop can dominate the median. Require two probes to
     // support a jump and leave larger rotations to the original detection.
     [branch]
@@ -176,7 +173,6 @@ float4 AnalyzeCameraFrame() : COLOR0
         float foreground = ForegroundScreenDisplacement(previousForward.w);
         if (foreground > 0.0) displacement = max(displacement, foreground);
     }
-#endif
     float speed = max(displacement, 0.0) / dt;
     if (displacement >= 0.0) {
         float oldSpeed = PreviousCamera(7.0).x;

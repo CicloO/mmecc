@@ -9,15 +9,8 @@ texture MotionField : RENDERCOLORTARGET < string Format = "A16B16G16R16F"; >;
 #define MB_TILE_RATIO float2 ViewPortRatio = {0.03125, 0.03125};
 texture TileMax : RENDERCOLORTARGET < MB_TILE_RATIO string Format = "A16B16G16R16F"; >;
 texture NeighborMax : RENDERCOLORTARGET < MB_TILE_RATIO string Format = "A16B16G16R16F"; >;
-#if MB_LAYERED_TRAIL
-texture TileAlternate : RENDERCOLORTARGET < MB_TILE_RATIO string Format = "A16B16G16R16F"; >;
-texture NeighborAlternate : RENDERCOLORTARGET < MB_TILE_RATIO string Format = "A16B16G16R16F"; >;
-#endif
 #define MB_TILE_ROW_RATIO float2 ViewPortRatio = {0.03125, 1.0};
 texture TileRows : RENDERCOLORTARGET < MB_TILE_ROW_RATIO string Format = "A16B16G16R16F"; >;
-#if MB_LAYERED_TRAIL
-texture TileAlternateRows : RENDERCOLORTARGET < MB_TILE_ROW_RATIO string Format = "A16B16G16R16F"; >;
-#endif
 texture TileRowsDepth : RENDERDEPTHSTENCILTARGET < MB_TILE_ROW_RATIO >;
 #undef MB_TILE_ROW_RATIO
 texture TileDepth : RENDERDEPTHSTENCILTARGET < MB_TILE_RATIO >;
@@ -27,11 +20,6 @@ sampler2D MotionSampler = sampler_state { Texture = <MotionField>; MB_POINT_FILT
 sampler2D TileSampler = sampler_state { Texture = <TileMax>; MB_POINT_FILTER };
 sampler2D NeighborSampler = sampler_state { Texture = <NeighborMax>; MB_POINT_FILTER };
 sampler2D TileRowsSampler = sampler_state { Texture = <TileRows>; MB_POINT_FILTER };
-#if MB_LAYERED_TRAIL
-sampler2D TileAlternateSampler = sampler_state { Texture = <TileAlternate>; MB_POINT_FILTER };
-sampler2D TileAlternateRowsSampler = sampler_state { Texture = <TileAlternateRows>; MB_POINT_FILTER };
-sampler2D NeighborAlternateSampler = sampler_state { Texture = <NeighborAlternate>; MB_POINT_FILTER };
-#endif
 
 #if MB_OUTLINE_MOTION
 #include "Outline.fxh"
@@ -92,19 +80,10 @@ struct TileReduction {
     float nearest;
 };
 
-#if MB_LAYERED_TRAIL
-// In TileRows only, this out-of-range log depth means every moving sample
-// has the primary's depth. Channel A then carries both depth bounds.
-static const float UniformRowDepth = 256.0;
-#endif
 
 float4 FinishTile(TileReduction reduction)
 {
-#if MB_LAYERED_TRAIL
-    return float4(reduction.primary.rg, reduction.nearest, reduction.primary.b);
-#else
     return float4(reduction.primary.rg, reduction.nearest, 0.0);
-#endif
 }
 
 bool FrameHasExposure()
@@ -130,9 +109,6 @@ float4 BuildTileRows(float2 quadUV : TEXCOORD0) : COLOR0
     float2 rasterSize = TileRasterSize(quadUV);
     TileReduction best = (TileReduction)0;
     best.nearest = 128.0;
-#if MB_LAYERED_TRAIL
-    float farthest = -128.0;
-#endif
     [branch]
     if (!FrameHasExposure()) {
         return FinishTile(best);
@@ -149,19 +125,8 @@ float4 BuildTileRows(float2 quadUV : TEXCOORD0) : COLOR0
         if (CanExtendTrail(motion.a)) {
             float lengthSquared = dot(motion.rg, motion.rg);
             AccumulateTile(best, motion.rgb, motion.b, lengthSquared);
-#if MB_LAYERED_TRAIL
-            if (lengthSquared >= MinStreak() * MinStreak()) {
-                farthest = max(farthest, motion.b);
-            }
-#endif
         }
     }
-#if MB_LAYERED_TRAIL
-    // Retain the original nearest value for rows with signed zero depth.
-    if (best.nearest == farthest && best.nearest != 0.0) {
-        best.nearest = UniformRowDepth;
-    }
-#endif
     return FinishTile(best);
 }
 
@@ -184,101 +149,11 @@ float4 BuildTileMax(float2 quadUV : TEXCOORD0) : COLOR0
         if (j >= count) break;
         float2 uv = (float2(tile.x, first + j) + 0.5) / float2(rasterSize.x, ScreenSize.y);
         float4 motion = tex2Dlod(TileRowsSampler, float4(uv, 0.0, 0.0));
-#if MB_LAYERED_TRAIL
-        float nearest = motion.b == UniformRowDepth ? motion.a : motion.b;
-        AccumulateTile(best, motion.rga, nearest, dot(motion.rg, motion.rg));
-#else
         AccumulateTile(best, motion.rgb, motion.b, dot(motion.rg, motion.rg));
-#endif
     }
     return FinishTile(best);
 }
 
-#if MB_LAYERED_TRAIL
-bool PreferAlternate(float3 motion, float lengthSquared, float4 best)
-{
-    // At equal speed, an opaque backing plane must not displace a nearer
-    // surface whose trail is visible across it.
-    return lengthSquared > best.a || (lengthSquared == best.a && motion.b < best.b);
-}
-
-// The row pass needs the actual tile raster size, including the host's rounding.
-// TileAlternate holds it until the vertical pass writes the alternate motion.
-float4 StoreAlternateTileSize(float2 quadUV : TEXCOORD0) : COLOR0
-{
-    return float4(TileRasterSize(quadUV), 0.0, 0.0);
-}
-
-// Rank each row against the tile's final primary depth before reducing rows.
-float4 BuildTileAlternateRows(float2 quadUV : TEXCOORD0) : COLOR0
-{
-    float2 rowSize = TileRasterSize(quadUV);
-    [branch]
-    if (!FrameHasExposure()) {
-        return 0.0;
-    }
-    float2 tileRow = floor(quadUV * rowSize + 0.5);
-    float2 rasterSize = tex2Dlod(TileAlternateSampler, float4(0.5, 0.5, 0.0, 0.0)).rg;
-    float2 span = ScreenSize / rasterSize;
-    float tileY = min(rasterSize.y - 1.0, floor((tileRow.y + 0.5) / span.y));
-    // Correct the guess at boundaries using the vertical pass's rounded bounds.
-    if (tileRow.y < floor(tileY * span.y + 0.5)) {
-        tileY -= 1.0;
-    } else if (tileRow.y >= floor((tileY + 1.0) * span.y + 0.5)) {
-        tileY += 1.0;
-    }
-    float2 tileUV = (float2(tileRow.x, tileY) + 0.5) / rasterSize;
-    float4 primary = tex2Dlod(TileSampler, float4(tileUV, 0.0, 0.0));
-    float2 rowUV = float2(tileUV.x, (tileRow.y + 0.5) / ScreenSize.y);
-    float4 row = tex2Dlod(TileRowsSampler, float4(rowUV, 0.0, 0.0));
-    float minLengthSquared = MinStreak() * MinStreak();
-    if (dot(row.rg, row.rg) < minLengthSquared) return 0.0;
-    bool depthSeparated = abs(row.a - primary.a) > 2.0 * DepthTolerance;
-    if (row.b == UniformRowDepth || (row.a == row.b && depthSeparated)) {
-        return depthSeparated ? row.rgaa : 0.0;
-    }
-    float first = floor(tileRow.x * span.x + 0.5);
-    float count = min(ScreenSize.x, floor((tileRow.x + 1.0) * span.x + 0.5)) - first;
-    float4 best = 0.0;
-    // Guard the samples explicitly. D3DX can compile the loop exit to an
-    // ineffective break and read past the tile on small or odd-sized viewports.
-    [fastopt]
-    for (int i = 0; i < MaxTileSpan; ++i) {
-        if (i >= count) continue;
-        float2 uv = (float2(first + i, tileRow.y) + 0.5) / ScreenSize;
-        float4 motion = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
-        float lengthSquared = dot(motion.rg, motion.rg);
-        if (CanExtendTrail(motion.a) && lengthSquared >= minLengthSquared &&
-            PreferAlternate(motion.rgb, lengthSquared, best) && abs(motion.b - primary.a) > 2.0 * DepthTolerance) {
-            best = float4(motion.rgb, lengthSquared);
-        }
-    }
-    return best.rgbb;
-}
-
-float4 BuildTileAlternate(float2 quadUV : TEXCOORD0) : COLOR0
-{
-    float2 rasterSize = TileRasterSize(quadUV);
-    [branch]
-    if (!FrameHasExposure()) return 0.0;
-    float2 tile = floor(quadUV * rasterSize + 0.5);
-    float span = ScreenSize.y / rasterSize.y;
-    float first = floor(tile.y * span + 0.5);
-    float count = min(ScreenSize.y, floor((tile.y + 1.0) * span + 0.5)) - first;
-    float4 best = 0.0;
-    [fastopt]
-    for (int j = 0; j < MaxTileSpan; ++j) {
-        if (j >= count) continue;
-        float2 rowUV = (float2(tile.x, first + j) + 0.5) / float2(rasterSize.x, ScreenSize.y);
-        float4 row = tex2Dlod(TileAlternateRowsSampler, float4(rowUV, 0.0, 0.0));
-        float lengthSquared = dot(row.rg, row.rg);
-        if (lengthSquared >= MinStreak() * MinStreak() && PreferAlternate(row.rgb, lengthSquared, best)) {
-            best = float4(row.rgb, lengthSquared);
-        }
-    }
-    return best.rgbb;
-}
-#endif
 
 void AccumulateNeighbor(inout TileReduction best, float4 sampleMotion, float2 gap,
                         bool alternate, float primaryDepth)
@@ -286,19 +161,7 @@ void AccumulateNeighbor(inout TileReduction best, float4 sampleMotion, float2 ga
     float lengthSquared = dot(sampleMotion.rg, sampleMotion.rg);
     float reach = 0.5 * sqrt(lengthSquared) + 1.0;
     if (dot(gap, gap) <= reach * reach) {
-#if MB_LAYERED_TRAIL
-        if (alternate) {
-            if (abs(sampleMotion.a - primaryDepth) > 2.0 * DepthTolerance &&
-                lengthSquared >= MinStreak() * MinStreak() &&
-                PreferAlternate(sampleMotion.rga, lengthSquared, best.primary)) {
-                best.primary = float4(sampleMotion.rga, lengthSquared);
-            }
-            return;
-        }
-        AccumulateTile(best, sampleMotion.rga, sampleMotion.b, lengthSquared);
-#else
         AccumulateTile(best, sampleMotion.rgb, sampleMotion.b, lengthSquared);
-#endif
     }
 }
 
@@ -315,12 +178,6 @@ void ReduceNeighborRow(inout TileReduction best, float2 tile, float2 tileSpan, f
             float2 uv = (sourceTile + 0.5) / rasterSize;
             float2 gap = max(0.0, (abs(sourceTile - tile) - 1.0) * tileSpan - 1.0);
             AccumulateNeighbor(best, tex2Dlod(TileSampler, float4(uv, 0.0, 0.0)), gap, alternate, primaryDepth);
-#if MB_LAYERED_TRAIL
-            // The tile maximum already bounds reach and nearest depth for both candidates.
-            if (alternate) {
-                AccumulateNeighbor(best, tex2Dlod(TileAlternateSampler, float4(uv, 0.0, 0.0)), gap, alternate, primaryDepth);
-            }
-#endif
         }
     }
 }
@@ -336,15 +193,6 @@ float4 ReduceNeighbors(float2 quadUV, bool alternate)
     }
     float2 tile = floor(quadUV * rasterSize + 0.5);
     float primaryDepth = 0.0;
-#if MB_LAYERED_TRAIL
-    if (alternate) {
-        float2 tileUV = (tile + 0.5) / rasterSize;
-        float4 primary = tex2Dlod(NeighborSampler, float4(tileUV, 0.0, 0.0));
-        [branch]
-        if (dot(primary.rg, primary.rg) < MinStreak() * MinStreak()) return 0.0;
-        primaryDepth = primary.a;
-    }
-#endif
     float2 tileSpan = ScreenSize / rasterSize;
     float2 radius = ceil((0.5 * MotionStreakLimit() + 1.0) / tileSpan);
     float2 first = max(0.0, tile - radius);
@@ -358,9 +206,6 @@ float4 ReduceNeighbors(float2 quadUV, bool alternate)
                               count.x, alternate, primaryDepth);
         }
     }
-#if MB_LAYERED_TRAIL
-    if (alternate) return best.primary.rgbb;
-#endif
     return FinishTile(best);
 }
 
@@ -369,23 +214,12 @@ float4 BuildNeighborMax(float2 quadUV : TEXCOORD0) : COLOR0
     return ReduceNeighbors(quadUV, false);
 }
 
-#if MB_LAYERED_TRAIL
-float4 BuildNeighborAlternate(float2 quadUV : TEXCOORD0) : COLOR0
-{
-    return ReduceNeighbors(quadUV, true);
-}
-
-float4 GatherForeground(float2 uv, float4 background, float4 center, float3 neighbor,
-                        float splitDepth, float depthSide)
-{
-#else
 float4 ExtendForeground(float2 uv, float4 background, float4 center)
 {
     if (IsProtectedSurface(center.a)) {
         return background;
     }
     float3 neighbor = tex2Dlod(NeighborSampler, float4(uv, 0.0, 0.0)).rgb;
-#endif
     bool hasDepth = center.a >= 0.5 || IsOrdinaryTranslucent(center.a);
     float streakLength = length(neighbor.rg);
     if (streakLength < MinStreak() || (hasDepth && center.b - neighbor.b <= DepthTolerance)) {
@@ -395,38 +229,12 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
     float2 direction = neighbor.rg / streakLength;
     float reach = 0.5 * streakLength + 0.75;
     int taps = (int)min(StreakTapBudget(64.0), ceil(2.0 * reach));
-#if MB_DENSE_FOREGROUND_TAPS
-    bool horizontal = abs(direction.x) >= abs(direction.y);
-    float rayAxis = horizontal ? direction.x : direction.y;
-    taps = max(taps, (int)ceil(2.0 * reach * abs(rayAxis)));
-#endif
     float spacing = 2.0 * reach / taps;
     float2 centerPixel = uv * ScreenSize;
     float phase = TrailTapPhase(uv);
     float4 exposure = 0.0;
-#if MB_DENSE_FOREGROUND_TAPS
-    int firstTap = 0;
-    int lastTap = taps;
-    if (taps > MaxLoopIterations) {
-        // Only large searches need clipping and batching. Keep the original
-        // tap grid and let the per-tap bounds check handle the other axis.
-        float axisCenter = horizontal ? centerPixel.x : centerPixel.y;
-        float axisSize = horizontal ? ScreenSize.x : ScreenSize.y;
-        float2 edgeOffsets = (float2(0.0, axisSize) - axisCenter) / rayAxis;
-        float start = min(edgeOffsets.x, edgeOffsets.y);
-        float finish = max(edgeOffsets.x, edgeOffsets.y);
-        firstTap = max(0, (int)floor((start + reach) / spacing - phase));
-        lastTap = min(taps, (int)ceil((finish + reach) / spacing + (1.0 - phase)));
-    }
-    [fastopt]
-    for (int first = firstTap; first < lastTap; first += MaxLoopIterations) {
-        int end = min(first + MaxLoopIterations, lastTap);
-    [fastopt]
-    for (int tap = first; tap < end; ++tap) {
-#else
     [fastopt]
     for (int tap = 0; tap < taps; ++tap) {
-#endif
         float offset = (tap + phase) * spacing - reach;
         float2 samplePixel = floor(centerPixel + offset * direction) + 0.5;
         if (any(samplePixel < 0.0) || any(samplePixel >= ScreenSize)) {
@@ -437,11 +245,6 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
         if (!CanExtendTrail(source.a)) {
             continue;
         }
-#if MB_LAYERED_TRAIL
-        if (depthSide != 0.0 && (source.b < splitDepth) != (depthSide < 0.0)) {
-            continue;
-        }
-#endif
         float sourceLength = length(source.rg);
         if (sourceLength < MinStreak() || (hasDepth && center.b - source.b <= DepthTolerance)) {
             continue;
@@ -464,7 +267,7 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
             support *= smoothstep(DepthTolerance, 2.0 * DepthTolerance, center.b - source.b);
         }
         if (support > 0.0) {
-            float4 sourceColor = DecodeTrailColor(tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0)));
+            float4 sourceColor = tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0));
 #if MB_USE_TRAIL_ALPHA
             float weight = support * spacing / max(1.0, sourceLength);
             exposure += sourceColor * weight;
@@ -475,45 +278,13 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
 #endif
         }
     }
-#if MB_DENSE_FOREGROUND_TAPS
-    }
-#endif
-#if MB_USE_LINEAR_LIGHT
-    if (!any(exposure != 0.0)) {
-        return background;
-    }
-    background = DecodeTrailColor(background);
-#endif
 #if MB_USE_TRAIL_ALPHA
     // Clamp coverage for overlapping taps and keep their average color.
     exposure /= max(1.0, exposure.a);
-    return EncodeTrailColor(exposure + background * (1.0 - exposure.a));
+    return exposure + background * (1.0 - exposure.a);
 #else
     float3 foreground = exposure.rgb / max(exposure.a, 0.0001);
-    return EncodeTrailColor(float4(lerp(background.rgb, foreground, saturate(exposure.a)), background.a));
+    return float4(lerp(background.rgb, foreground, saturate(exposure.a)), background.a);
 #endif
 }
 
-#if MB_LAYERED_TRAIL
-float4 ExtendForeground(float2 uv, float4 background, float4 center)
-{
-    if (IsProtectedSurface(center.a)) {
-        return background;
-    }
-    float4 primary = tex2Dlod(NeighborSampler, float4(uv, 0.0, 0.0));
-    float4 alternate = tex2Dlod(NeighborAlternateSampler, float4(uv, 0.0, 0.0));
-    bool twoLayers = dot(alternate.rg, alternate.rg) >= MinStreak() * MinStreak();
-    bool primaryIsFar = primary.a > alternate.a;
-    float3 farLayer = primaryIsFar ? primary.rgb : alternate.rgb;
-    float3 nearLayer = primaryIsFar ? alternate.rgb : primary.rgb;
-    float splitDepth = 0.5 * (primary.a + alternate.a);
-    [loop]
-    for (int layer = 0; layer < 2; ++layer) {
-        if (layer > 0 && !twoLayers) break;
-        float3 candidate = twoLayers ? (layer == 0 ? farLayer : nearLayer) : primary.rgb;
-        float depthSide = twoLayers ? (layer == 0 ? 1.0 : -1.0) : 0.0;
-        background = GatherForeground(uv, background, center, candidate, splitDepth, depthSide);
-    }
-    return background;
-}
-#endif

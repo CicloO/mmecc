@@ -48,27 +48,23 @@ float Timeline : TIME < bool SyncInEditMode = true; >;
 #endif
 
 #if MB_VERTEX_HISTORY
-#ifndef MB_HISTORY_ROWS
-#define MB_HISTORY_ROWS MB_HISTORY_SIZE
-#endif
-
 int VertexCount;
-static const float2 AtlasSize = float2(MB_HISTORY_SIZE, MB_HISTORY_ROWS);
-static const int AtlasCapacity = MB_HISTORY_SIZE * MB_HISTORY_ROWS;
+static const float2 AtlasSize = float2(MB_HISTORY_SIZE, MB_HISTORY_SIZE);
+static const int AtlasCapacity = MB_HISTORY_SIZE * MB_HISTORY_SIZE;
 
 texture CurrentVertices : RENDERCOLORTARGET <
     int Width = MB_HISTORY_SIZE;
-    int Height = MB_HISTORY_ROWS;
+    int Height = MB_HISTORY_SIZE;
     string Format = "A32B32G32R32F";
 >;
 texture PreviousVertices : RENDERCOLORTARGET <
     int Width = MB_HISTORY_SIZE;
-    int Height = MB_HISTORY_ROWS;
+    int Height = MB_HISTORY_SIZE;
     string Format = "A32B32G32R32F";
 >;
 texture AtlasDepth : RENDERDEPTHSTENCILTARGET <
     int Width = MB_HISTORY_SIZE;
-    int Height = MB_HISTORY_ROWS;
+    int Height = MB_HISTORY_SIZE;
 >;
 
 sampler2D CurrentSampler = sampler_state { Texture = <CurrentVertices>; MB_HISTORY_FILTER };
@@ -86,7 +82,7 @@ bool FitsAtlas(int index)
 }
 #endif
 
-#if MB_RIGID_HISTORY || (MB_VERTEX_HISTORY && (MB_DEBUG == 5 || MB_KEEP_OBJECT_MOTION_ON_CUT))
+#if MB_RIGID_HISTORY || (MB_VERTEX_HISTORY && MB_KEEP_OBJECT_MOTION_ON_CUT)
 float4x4 ObjectToWorld : WORLD;
 float4x4 WorldToClip : VIEWPROJECTION;
 #endif
@@ -121,16 +117,6 @@ float4 ReprojectHistory(float4 world, float4x4 camera)
 #include "RigidHistory.fxh"
 #endif
 
-#if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
-float ProjectionError(float4 expected, float4 projected)
-{
-    if (expected.w <= 0.0001 || projected.w <= 0.0001) {
-        return 65504.0;
-    }
-    float2 delta = (expected.xy / expected.w - projected.xy / projected.w) * (0.5 * TargetSize);
-    return min(length(delta), 65504.0);
-}
-#endif
 
 struct GeometryOutput {
     float4 position : POSITION;
@@ -140,9 +126,7 @@ struct GeometryOutput {
     float4 previousClip : TEXCOORD2;
     float3 currentClip : TEXCOORD3;
 #endif
-#if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
-    float2 projectionError : TEXCOORD4;
-#elif MB_VERTEX_HISTORY && !MB_KEEP_OBJECT_MOTION_ON_CUT
+#if MB_VERTEX_HISTORY && !MB_KEEP_OBJECT_MOTION_ON_CUT
     float historyInterval : TEXCOORD4;
 #endif
 #if MB_KEEP_OBJECT_MOTION_ON_CUT && MB_GEOMETRY_HISTORY
@@ -160,11 +144,6 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
     output.position = mul(position, ObjectToClip);
     output.uv = uv;
     output.viewDepth = mul(position, ObjectToView).z;
-#if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
-    output.projectionError = float2(
-        ProjectionError(output.position, mul(position, WorldToClip)),
-        ProjectionError(output.position, mul(mul(position, ObjectToWorld), WorldToClip)));
-#endif
 #if MB_VERTEX_HISTORY
     float2 atlasUV = (AtlasCell(index) + 0.5) / AtlasSize;
     float4 stored = tex2Dlod(PreviousSampler, float4(atlasUV, 0.0, 0.0));
@@ -190,9 +169,7 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
     bool valid = FitsAtlas(index) && stored.w >= 0.0 && stored.z > 0.0001
         && dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP;
     output.previousClip = valid ? float4(stored.xyz, 1.0) : 0.0;
-#if MB_DEBUG != 5
     output.historyInterval = valid ? dt : 0.0;
-#endif
 #endif
 #elif MB_RIGID_HISTORY
     float4 previousWorld = RigidPreviousWorld(position);
@@ -236,9 +213,6 @@ float4 SurfaceDepth(GeometryOutput input)
     float alpha = MaterialCoverage(input.uv);
     clip(alpha - 0.004);
     float depth = log2(max(input.viewDepth, 0.0001));
-#if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
-    return float4(input.projectionError, depth, 5.0);
-#else
 #if MB_TRANSLUCENT_MOTION
     if (opadd) {
         return float4(0.0, 0.0, depth, AdditiveCoverage);
@@ -258,7 +232,6 @@ float4 SurfaceDepth(GeometryOutput input)
     }
 #endif
     return float4(0.0, 0.0, depth, coverage);
-#endif
 }
 
 #if MB_KEEP_OBJECT_MOTION_ON_CUT
