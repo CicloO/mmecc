@@ -1,5 +1,6 @@
 #include "Settings.fxh"
 #include "Fullscreen.fxh"
+#include "ModelTiming.fxh"
 
 float2 ScreenSize : VIEWPORTPIXELSIZE;
 
@@ -111,7 +112,7 @@ float ExposureScale()
 float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
 {
     float dt = CameraBlurInterval(camera);
-    if (dt <= 0.0 || geometry.a < 0.5 || geometry.a > 2.5) {
+    if (dt <= 0.0 || geometry.a <= 0.0 || geometry.a > 2.5) {
         return 0.0;
     }
     float2 delta;
@@ -123,7 +124,7 @@ float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
     } else
 #endif
     {
-        delta = geometry.a > 1.5 ? geometry.rg : CameraDisplacement(uv, geometry.b);
+        delta = HasModelMotion(geometry.a, dt) ? geometry.rg : CameraDisplacement(uv, geometry.b);
     }
     float distance = length(delta);
     if (!(distance >= 0.01 && distance < length(ScreenSize) * 0.65)) {
@@ -167,7 +168,7 @@ float TapWeight(float4 center, float4 sampleGeometry, float sampleAlpha)
     if (sampleGeometry.a > 2.5 && sampleGeometry.a < 3.5) {
         return 0.0;
     }
-    if (sampleGeometry.a < 0.5) {
+    if (sampleGeometry.a <= 0.0) {
         return MB_EDGE_BACKGROUND ? 1.0 : 0.0;
     }
     float gap = sampleGeometry.b - center.b;
@@ -266,13 +267,13 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     float4 geometry = tex2Dlod(GeometrySampler, float4(uv, 0.0, 0.0));
 #if MB_DEBUG == 3
     float depth = saturate((geometry.b + 2.0) / 11.0);
-    return float4(depth.xxx * step(0.5, geometry.a), 1.0);
+    return float4(depth.xxx * (geometry.a > 0.0), 1.0);
 #elif MB_DEBUG == 4
     if (geometry.a > 3.5) {
         return float4(1.0, 1.0, 0.0, 1.0);
     }
-    return float4(geometry.a > 2.5, geometry.a > 1.5 && geometry.a < 2.5,
-                  geometry.a > 0.5 && geometry.a < 1.5, 1.0);
+    bool modelMotion = HasModelMotion(geometry.a, CurrentCameraAnalysis().x);
+    return float4(geometry.a > 2.5, modelMotion, geometry.a > 0.0 && geometry.a < 2.5 && !modelMotion, 1.0);
 #elif MB_DEBUG == 5
     if (geometry.a < 4.5) {
         return float4(0.0, 0.0, 0.0, 1.0);

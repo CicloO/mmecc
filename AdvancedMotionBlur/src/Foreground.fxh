@@ -49,6 +49,9 @@ float4 BuildMotionField(float2 quadUV : TEXCOORD0) : COLOR0
     }
 #endif
     float2 streak = ExposureStreak(quadUV + offset, geometry, camera);
+    if (coverage > 0.0 && coverage < 0.5) {
+        coverage = 2.0;
+    }
     return float4(streak, geometry.b, coverage);
 }
 

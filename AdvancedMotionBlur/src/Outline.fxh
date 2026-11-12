@@ -7,7 +7,7 @@
 
 bool IsOpaqueSurface(float4 geometry)
 {
-    return geometry.a >= 0.5 && geometry.a < 2.5;
+    return geometry.a > 0.0 && geometry.a < 2.5;
 }
 
 float SceneLuma(float2 uv)
@@ -81,7 +81,7 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
     for (int n = 0; n < 4; ++n) {
         float2 step = (n < 2 ? float2(1.0, 0.0) : float2(0.0, 1.0)) * ((n % 2 == 0) ? 1.0 : -1.0);
         float4 neighbor = tex2Dlod(GeometrySampler, float4(uv + step * texel, 0.0, 0.0));
-        bool behind = center.a < 0.5 || center.b - neighbor.b > DepthTolerance;
+        bool behind = center.a <= 0.0 || center.b - neighbor.b > DepthTolerance;
         bool sameLayer = abs(center.b - neighbor.b) <= 2.0 * DepthTolerance;
         if (!touchesOutline && neighbor.a > 3.5 && (translucent ? (behind || sameLayer) : behind)) {
             touchesOutline = true;
@@ -118,9 +118,9 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
             bool useA = IsOpaqueSurface(a) && (!IsOpaqueSurface(b) || a.b < b.b);
             float4 front = useA ? a : b;
             float4 back = useA ? b : a;
-            bool sameBack = center.a < 0.5 ? back.a < 0.5
+            bool sameBack = center.a <= 0.0 ? back.a <= 0.0
                 : IsOpaqueSurface(back) && abs(back.b - center.b) <= DepthTolerance;
-            bool closer = center.a < 0.5 || center.b - front.b > DepthTolerance;
+            bool closer = center.a <= 0.0 || center.b - front.b > DepthTolerance;
             if (IsOpaqueSurface(front) && sameBack && closer && (coverage < 3.5 || front.b < resolved.b)) {
                 resolved = front;
                 offset = useA ? -step : step;

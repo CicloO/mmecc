@@ -1,4 +1,5 @@
 #include "Settings.fxh"
+#include "ModelTiming.fxh"
 
 #ifndef MB_RIGID_HISTORY
 #define MB_RIGID_HISTORY 0
@@ -135,6 +136,8 @@ struct GeometryOutput {
 #endif
 #if MB_DEBUG == 5 && MB_GEOMETRY_HISTORY
     float2 projectionError : TEXCOORD4;
+#elif MB_VERTEX_HISTORY && !MB_KEEP_OBJECT_MOTION_ON_CUT
+    float historyInterval : TEXCOORD4;
 #endif
 #if MB_KEEP_OBJECT_MOTION_ON_CUT && MB_GEOMETRY_HISTORY
     float4 previousLocalClip : TEXCOORD5;
@@ -177,10 +180,13 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
         output.previousLocalClip = ReprojectHistory(world, WorldToClip);
     }
 #else
-    float dt = Timeline - (stored.w - 1.0);
-    bool valid = FitsAtlas(index) && stored.w >= 1.0 && stored.z > 0.0001
+    float dt = Timeline - stored.w;
+    bool valid = FitsAtlas(index) && stored.w >= 0.0 && stored.z > 0.0001
         && dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP;
     output.previousClip = valid ? float4(stored.xyz, 1.0) : 0.0;
+#if MB_DEBUG != 5
+    output.historyInterval = valid ? dt : 0.0;
+#endif
 #endif
 #elif MB_RIGID_HISTORY
     float4 previousWorld = RigidPreviousWorld(position);
@@ -230,7 +236,12 @@ float4 SurfaceDepth(GeometryOutput input)
     float coverage = (alpha >= 0.985 && !opadd) ? 1.0 : 3.0;
 #if MB_GEOMETRY_HISTORY
     if (coverage == 1.0 && input.previousClip.w > 0.999 && input.currentClip.z > 0.0001) {
-        return float4(GeometryMotion(input.currentClip, input.previousClip.xyz), depth, 2.0);
+#if MB_VERTEX_HISTORY && !MB_KEEP_OBJECT_MOTION_ON_CUT
+        float motionCoverage = EncodeModelInterval(input.historyInterval);
+#else
+        float motionCoverage = 2.0;
+#endif
+        return float4(GeometryMotion(input.currentClip, input.previousClip.xyz), depth, motionCoverage);
     }
 #endif
     return float4(0.0, 0.0, depth, coverage);
@@ -294,7 +305,7 @@ AtlasVertex RecordVertex(float4 position : POSITION, int index : _INDEX)
 #if MB_KEEP_OBJECT_MOTION_ON_CUT
     output.data = float4(mul(position, ObjectToWorld).xyz, -(Timeline + 1.0));
 #else
-    output.data = float4(mul(position, ObjectToClip).xyw, Timeline + 1.0);
+    output.data = float4(mul(position, ObjectToClip).xyw, Timeline);
 #endif
     return output;
 }
