@@ -347,6 +347,7 @@ Soboro 的发行说明记载 2.2 侧重修正与视频用途，3.0 增加静画�
 - 静止全帧逐像素一致，重复绘制一致，普通输出 Alpha 一致。关闭抖动后，各质量档和密采样均与前版逐像素一致。两种分辨率下，密采样的 512 px 细线通过水平、斜向和反向靠画面左缘的浮点连续性检查。
 - FXC 70 组共 280 次通过，覆盖 P0、P1、各质量档、密采样、预乘 Alpha 和输出抖动组合。`d3dx9_43` 的主效果编译约 1.06 秒（默认或单开抖动），组合约 2.70 秒。
 - `dist/review-sample-jitter` 的 `Sampling-comparison.png` 是同一 1080p 离屏用例的着色器结果，局部按最近邻放大两倍。源码试用目录初始开启采样抖动，`Profiles/Settings.Fixed.fxh` 和 `Profiles/Settings.Jitter.fxh` 只差 `MB_SAMPLE_JITTER`。使用相同导出起点和画质档，在 MMD 对照快速肢体或细线的残影与颗粒。开发默认关闭，待实机观感验收。
+- 追加动态对照 `dist/review-sample-jitter/Sampling-motion-comparison.mp4`。用 `H:/Coding/MotionBlurReview` 的 Default 和 Jitter，确认两份效果只差 `MB_SAMPLE_JITTER`。D3D9 HAL 在 1920×1080 默认画质下逐步平移细线，使用相同的 128 px 拖影输入，输出 73 帧并按 30 fps 慢放。青线区域的列均值平均绝对偏差从 1.5000 降至 0.1048 个 8 位色阶。按线的位置对齐后，110592 个像素对的相邻帧绿通道平均绝对差从 0 升至 0.9381。重复绘制和 Alpha 对照通过。
 
 ## 下一阶段
 
