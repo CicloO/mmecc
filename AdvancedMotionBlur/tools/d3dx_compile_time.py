@@ -16,10 +16,10 @@ import ctypes
 import re
 import shutil
 import sys
-import tempfile
 import time
 from ctypes import POINTER, WINFUNCTYPE, byref, c_long, c_uint32, c_void_p, c_wchar_p
 from pathlib import Path
+from uuid import uuid4
 
 d3dx = ctypes.WinDLL("d3dx9_43.dll")
 create = d3dx.D3DXCreateEffectCompilerFromFileW
@@ -100,7 +100,10 @@ def precompile_package(source, destination):
             raise ValueError(f"Use the source version of {path}")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=".amb-precompile-", dir=destination.parent))
+    # The staging directory becomes the finished package. Let it inherit the
+    # destination parent's ACL instead of publishing a private temporary directory.
+    staging = destination.parent / f".amb-precompile-{uuid4().hex}"
+    staging.mkdir()
     try:
         for path in source.iterdir():
             if path.is_file() and path.suffix.lower() in {".fx", ".fxh", ".x", ".pmx"}:
