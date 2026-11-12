@@ -1,5 +1,11 @@
 # AdvancedMotionBlur 实机对照
 
+## 直接载入验收副本
+
+`H:\Coding\MotionBlurReview\Scenes` 的 PMM／EMM 对照副本使用 `80f166d`。打开相应 PMM 即可测试带场景、切镜、两种抖动和预编译。对应工程名和帧位见 `H:\Coding\MotionBlurReview\READ-ME.md`。这些副本使用本机原工程的绝对资产路径，画面对照使用原控制器。新版控制器表情须在另一个副本中载入后核对。
+
+## 手动切换配置
+
 `dist/review-5763069-combined` 的 `Source` 和 `PrecompiledScene` 都来自 `5763069`。两边初始使用相同的 Scene 配置。`Profiles` 下的文件供源码版切换使用。
 
 用 PMM 副本载入 `Source/AdvancedMotionBlur.x`。在 MME 的 `GeometryData` 页确认分配的效果都来自这一套目录。角色用 `MotionGeometry.fx`，按原工程保留舞台映射和白底的 `DepthVelocity.fx`。需要附件自身拖影时给移动的 `.x` 分配 `RigidMotion.fx`。保持原来的附件绘制顺序。
