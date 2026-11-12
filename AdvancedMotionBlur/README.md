@@ -61,6 +61,7 @@ P1 会把快速前景的拖尾延伸到轮廓外，可覆盖空白底色或较�
 | `MB_CUT_ANGLE_COS` | 0.766 | 相邻渲染帧间约 40° 的切镜保护 |
 | `MB_CUT_SCREEN_HEIGHT` | 0.15 | 屏幕位移中值超过画面高度的比例，0 关闭位移判定 |
 | `MB_CUT_SPEED_RATIO` | 3.0 | 位移超过阈值时，还需要超过上一帧屏幕速度的倍数 |
+| `MB_CUT_FOREGROUND_PROBES` | 0 | 1 在镜头朝向基本一致时追加位移和缩放采样，检测远景中的主体推拉和跳切 |
 | `MB_CLEAR_RGBA` | 1, 1, 1, 0 | 场景捕获的初始底色 |
 | `MB_TRAIL_ALPHA` | 0 | 1 试用带覆盖率的透明拖尾，输出预乘 RGBA |
 | `MB_TRANSLUCENT_MOTION` | 0 | 1 试用发梢等普通 Alpha 材质的同层模糊 |

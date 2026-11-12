@@ -108,6 +108,39 @@ float MedianScreenDisplacement()
     return valid == 5 ? samples[2] : (valid >= 3 ? samples[1] : samples[0]);
 }
 
+#if MB_CUT_FOREGROUND_PROBES
+float ForegroundScreenDisplacement(float previousZoom)
+{
+    float4x4 previous = PreviousViewProjection();
+    float2 screenScale = 0.5 * float2(ScreenSize.x / ScreenSize.y, 1.0);
+    float zoomRatio = Projection[1][1] / max(previousZoom, 0.0001);
+    float largest = 0.0;
+    float second = 0.0;
+    [loop]
+    for (int row = 1; row <= 5; ++row) {
+        [loop]
+        for (int column = 1; column <= 7; ++column) {
+            float2 uv = float2(column, row) / float2(8.0, 6.0);
+            float4 geometry = tex2Dlod(GeometrySampler, float4(uv, 0.0, 0.0));
+            if (!HasGeometryCoverage(geometry.a) || IsProtectedSurface(geometry.a)) continue;
+            float2 ndc = (uv * 2.0 - 1.0) * float2(1.0, -1.0);
+            float4 oldClip = ReprojectToPrevious(ndc, geometry.b, previous);
+            float distance = 4.0;
+            if (oldClip.w > 0.0001) {
+                float currentW = exp2(geometry.b) * Projection[2][3] + Projection[3][3];
+                float scale = max(zoomRatio * oldClip.w / max(currentW, 0.0001), 0.0001);
+                // A centred subject can change size while its centre stays still.
+                float scaleJump = 0.5 * (max(scale, rcp(scale)) - 1.0);
+                distance = min(max(length((ndc - oldClip.xy / oldClip.w) * screenScale), scaleJump), 4.0);
+            }
+            second = max(second, min(largest, distance));
+            largest = max(largest, distance);
+        }
+    }
+    return second;
+}
+#endif
+
 float4 AnalyzeCameraFrame() : COLOR0
 {
     float4 timing = PreviousCamera(4.0);
@@ -124,6 +157,16 @@ float4 AnalyzeCameraFrame() : COLOR0
         || abs(previousUp.w - Projection[2][3]) > 0.5;
 
     float displacement = MB_CUT_SCREEN_HEIGHT > 0.0 ? MedianScreenDisplacement() : -1.0;
+#if MB_CUT_FOREGROUND_PROBES
+    // A distant backdrop can dominate the median. Require two probes to
+    // support a jump and leave larger rotations to the original detection.
+    [branch]
+    if (MB_CUT_SCREEN_HEIGHT > 0.0 && !cut
+        && dot(previousForward.xyz, CameraForward()) > 0.999 && dot(previousUp.xyz, CameraUp()) > 0.999) {
+        float foreground = ForegroundScreenDisplacement(previousForward.w);
+        if (foreground > 0.0) displacement = max(displacement, foreground);
+    }
+#endif
     float speed = max(displacement, 0.0) / dt;
     if (displacement >= 0.0) {
         float oldSpeed = PreviousCamera(7.0).x;
