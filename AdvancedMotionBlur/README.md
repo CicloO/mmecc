@@ -80,7 +80,8 @@ P1 会把快速前景的拖尾延伸到轮廓外，可覆盖空白底色或较�
 | `MB_OUTLINE_MOTION` | 1 | P1 启用原生描边和细后处理描边的速度修正。设为 0 可保留 P1 拖尾并单独对照描边处理 |
 | `MB_AUTO_MODEL_MOTION` | 1 | 为 PMX／PMD 默认启用顶点历史；设为 0 时默认只计算镜头运动，可通过 `GeometryData` 为角色手动开启 |
 | `MB_ACCESSORY_MOTION` | 0 | 1 为移动的 `.x` 附件启用矩阵历史，固定镜头也能试用附件自身拖影 |
-| `MB_HISTORY_SIZE` | 512 | 顶点图集边长，默认容量 262,144 |
+| `MB_HISTORY_SIZE` | 512 | 顶点图集宽度，旧设置仍按该值生成方形图集 |
+| `MB_HISTORY_ROWS` | `MB_HISTORY_SIZE` | 顶点图集行数，宽度 × 行数为容量。512×256 可容纳 131,072 个顶点 |
 | `MB_KEEP_OBJECT_MOTION_ON_CUT` | 0 | 实验项，使用世界空间顶点历史，切镜时保留角色自身动作模糊 |
 | `MB_TELEPORT_DISTANCE` | 50.0 | 世界空间顶点历史或附件矩阵历史开启时，超过此世界距离的顶点回退到镜头速度，0 关闭检查 |
 

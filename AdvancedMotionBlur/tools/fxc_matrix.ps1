@@ -25,6 +25,10 @@ $review = @{
 }
 $cases = @(
     @{ Name = 'default'; Set = @{} },
+    @{ Name = 'history256'; Set = @{ MB_HISTORY_SIZE = '256' } },
+    @{ Name = 'historyhalf'; Set = @{ MB_HISTORY_ROWS = '256' } },
+    @{ Name = 'historyodd'; Set = @{ MB_HISTORY_SIZE = '385'; MB_HISTORY_ROWS = '257' } },
+    @{ Name = 'historywideworld'; Set = @{ MB_HISTORY_SIZE = '1024'; MB_HISTORY_ROWS = '512'; MB_KEEP_OBJECT_MOTION_ON_CUT = '1' } },
     @{ Name = 'height0'; Set = @{ MB_SCALE_STREAK_WITH_HEIGHT = '0' } },
     @{ Name = 'height0layered'; Set = @{ MB_SCALE_STREAK_WITH_HEIGHT = '0'; MB_LAYERED_TRAIL = '1' } },
     @{ Name = 'alpha'; Set = @{ MB_TRAIL_ALPHA = '1' } },

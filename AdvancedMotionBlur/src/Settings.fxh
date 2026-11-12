@@ -30,6 +30,7 @@
 #define MB_OUTLINE_MOTION 1       // 0: disable outline coverage and velocity repair
 #define MB_AUTO_MODEL_MOTION 1     // PMD/PMX use vertex history by default
 #define MB_ACCESSORY_MOTION 0      // 1: .x accessories use rigid matrix history
-#define MB_HISTORY_SIZE 512        // Square vertex atlas used by MotionGeometry.fx
+#define MB_HISTORY_SIZE 512        // Vertex history atlas width in MotionGeometry.fx
+#define MB_HISTORY_ROWS MB_HISTORY_SIZE // Vertex history atlas height; defaults to a square
 #define MB_KEEP_OBJECT_MOTION_ON_CUT 0 // 1: store world-space history and keep model motion across cuts
 #define MB_TELEPORT_DISTANCE 50.0  // World units per history interval; 0 disables the check

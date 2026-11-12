@@ -48,21 +48,27 @@ float Timeline : TIME < bool SyncInEditMode = true; >;
 #endif
 
 #if MB_VERTEX_HISTORY
+#ifndef MB_HISTORY_ROWS
+#define MB_HISTORY_ROWS MB_HISTORY_SIZE
+#endif
+
 int VertexCount;
+static const float2 AtlasSize = float2(MB_HISTORY_SIZE, MB_HISTORY_ROWS);
+static const int AtlasCapacity = MB_HISTORY_SIZE * MB_HISTORY_ROWS;
 
 texture CurrentVertices : RENDERCOLORTARGET <
     int Width = MB_HISTORY_SIZE;
-    int Height = MB_HISTORY_SIZE;
+    int Height = MB_HISTORY_ROWS;
     string Format = "A32B32G32R32F";
 >;
 texture PreviousVertices : RENDERCOLORTARGET <
     int Width = MB_HISTORY_SIZE;
-    int Height = MB_HISTORY_SIZE;
+    int Height = MB_HISTORY_ROWS;
     string Format = "A32B32G32R32F";
 >;
 texture AtlasDepth : RENDERDEPTHSTENCILTARGET <
     int Width = MB_HISTORY_SIZE;
-    int Height = MB_HISTORY_SIZE;
+    int Height = MB_HISTORY_ROWS;
 >;
 
 sampler2D CurrentSampler = sampler_state { Texture = <CurrentVertices>; MB_HISTORY_FILTER };
@@ -76,8 +82,7 @@ float2 AtlasCell(int index)
 
 bool FitsAtlas(int index)
 {
-    return VertexCount <= MB_HISTORY_SIZE * MB_HISTORY_SIZE
-        && index >= 0 && index < MB_HISTORY_SIZE * MB_HISTORY_SIZE;
+    return VertexCount <= AtlasCapacity && index >= 0 && index < AtlasCapacity;
 }
 #endif
 
@@ -161,7 +166,7 @@ GeometryOutput ProjectGeometry(float4 position : POSITION, float2 uv : TEXCOORD0
         ProjectionError(output.position, mul(mul(position, ObjectToWorld), WorldToClip)));
 #endif
 #if MB_VERTEX_HISTORY
-    float2 atlasUV = (AtlasCell(index) + 0.5) / MB_HISTORY_SIZE;
+    float2 atlasUV = (AtlasCell(index) + 0.5) / AtlasSize;
     float4 stored = tex2Dlod(PreviousSampler, float4(atlasUV, 0.0, 0.0));
 #if MB_KEEP_OBJECT_MOTION_ON_CUT
     // World histories carry a negative timestamp, so an older clip-space atlas
@@ -308,7 +313,7 @@ AtlasVertex RecordVertex(float4 position : POSITION, int index : _INDEX)
 {
     AtlasVertex output;
     float2 cell = AtlasCell(index);
-    float2 clipXY = (cell * (2.0 / MB_HISTORY_SIZE) - 1.0) * float2(1.0, -1.0);
+    float2 clipXY = (cell * (2.0 / AtlasSize) - 1.0) * float2(1.0, -1.0);
     output.position = FitsAtlas(index) ? float4(clipXY, 0.0, 1.0) : float4(4.0, 4.0, 0.0, 1.0);
 #if MB_KEEP_OBJECT_MOTION_ON_CUT
     output.data = float4(mul(position, ObjectToWorld).xyz, -(Timeline + 1.0));
@@ -325,7 +330,7 @@ float4 RecordPixel(float4 data : TEXCOORD0) : COLOR0
 
 float4 CopyAtlas(float2 quadUV : TEXCOORD0) : COLOR0
 {
-    float2 uv = quadUV + 0.5 / MB_HISTORY_SIZE;
+    float2 uv = quadUV + 0.5 / AtlasSize;
     return tex2Dlod(CurrentSampler, float4(uv, 0.0, 0.0));
 }
 
