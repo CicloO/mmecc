@@ -1,0 +1,113 @@
+/* EyeHLWobble.fxsub - 眼睛高光颤动：共用控制与顶点着色器
+   入口 FX 先 #define 下列默认值与 HL_CONTROLLER，再 #include 本文件（MME 以入口 FX 所在目录解析 include）。
+   控制器 PMX 全部表情为 0 时使用入口 FX 的默认值；每对 + / - 按 8 倍 / 1/8 倍调节，同时为 1 互相抵消。
+*/
+
+// ==========================================================
+// 1. 控制器表情（EyeHLWobbleCtrl.pmx，未载入时全部为 0）
+// ==========================================================
+float HL_Stop : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x91\x53\x5D\x92\xE2\x8E\x7E"; >;
+float HL_WigPowUp : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x8D\x57\x5D\x95\x9D\x2B"; >;
+float HL_WigPowDn : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x8D\x57\x5D\x95\x9D\x2D"; >;
+float HL_WigSpdUp : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x8D\x57\x5D\x91\xAC\x2B"; >;
+float HL_WigSpdDn : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x8D\x57\x5D\x91\xAC\x2D"; >;
+float HL_TrePowUp : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x90\x6B\x5D\x95\x9D\x2B"; >;
+float HL_TrePowDn : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x90\x6B\x5D\x95\x9D\x2D"; >;
+float HL_TreSpdUp : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x90\x6B\x5D\x91\xAC\x2B"; >;
+float HL_TreSpdDn : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x90\x6B\x5D\x91\xAC\x2D"; >;
+float HL_TreTilUp : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x90\x6B\x5D\x96\xA7\x2B"; >;
+float HL_TreTilDn : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x90\x6B\x5D\x96\xA7\x2D"; >;
+float HL_MaxOffUp : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x96\x68\x5D\x95\x9D\x8C\xC0\x2B"; >;
+float HL_MaxOffDn : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x96\x68\x5D\x95\x9D\x8C\xC0\x2D"; >;
+float HL_DepthUp : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x96\x68\x5D\x91\x4F\x8F\x6F\x2B"; >;
+float HL_DepthDn : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x96\x68\x5D\x91\x4F\x8F\x6F\x2D"; >;
+float HL_BlinkUp : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x96\x68\x5D\x8F\x75\x2B"; >;
+float HL_BlinkDn : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x96\x68\x5D\x8F\x75\x2D"; >;
+float HL_BrightUp : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x8C\xF5\x5D\x97\xBA\x2B"; >;
+float HL_BrightDn : CONTROLOBJECT < string name = HL_CONTROLLER; string item = "\x5B\x8C\xF5\x5D\x97\xBA\x2D"; >;
+
+// 眨眼时衰减抖动：读取模型自身的眨眼/wink 表情
+float MorphBlink : CONTROLOBJECT < string name = "(self)"; string item = "\x82\xDC\x82\xCE\x82\xBD\x82\xAB"; >;
+float MorphWinkL : CONTROLOBJECT < string name = "(self)"; string item = "\x83\x45\x83\x42\x83\x93\x83\x4E"; >;
+float MorphWinkR : CONTROLOBJECT < string name = "(self)"; string item = "\x83\x45\x83\x42\x83\x93\x83\x4E\x89\x45"; >;
+float MorphWinkL2 : CONTROLOBJECT < string name = "(self)"; string item = "\x83\x45\x83\x42\x83\x93\x83\x4E\x82\x51"; >;
+float MorphWinkR2 : CONTROLOBJECT < string name = "(self)"; string item = "\xB3\xA8\xDD\xB8\x82\x51\x89\x45"; >;
+
+#define HL_SCALE(up, dn) exp2(3.0 * ((up) - (dn)))
+
+// ==========================================================
+// 2. 最终参数 = 入口默认值 x 控制器调节
+// ==========================================================
+static float HL_Live        = 1.0 - saturate(HL_Stop);                       // [全]停止
+static float WigglePower    = HL_WIGGLE_POWER  * HL_SCALE(HL_WigPowUp, HL_WigPowDn) * HL_Live;
+static float WiggleSpeed    = HL_WIGGLE_SPEED  * HL_SCALE(HL_WigSpdUp, HL_WigSpdDn);
+static float TremblePower   = HL_TREMBLE_POWER * HL_SCALE(HL_TrePowUp, HL_TrePowDn) * HL_Live;
+static float TrembleSpeed   = HL_TREMBLE_SPEED * HL_SCALE(HL_TreSpdUp, HL_TreSpdDn);
+static float NoiseTiling    = HL_NOISE_TILING  * HL_SCALE(HL_TreTilUp, HL_TreTilDn);
+static float MaxOffset      = HL_MAX_OFFSET    * HL_SCALE(HL_MaxOffUp, HL_MaxOffDn);
+static float DepthBias      = HL_DEPTH_BIAS    * HL_SCALE(HL_DepthUp,  HL_DepthDn);
+static float BlinkDamp      = saturate(HL_BLINK_DAMP + HL_BlinkUp - HL_BlinkDn);
+static float Brightness     = HL_BRIGHTNESS    * HL_SCALE(HL_BrightUp, HL_BrightDn);
+
+// ==========================================================
+// 3. 资源
+// ==========================================================
+float4x4 WorldViewMatrix : WORLDVIEW;
+float4x4 ProjMatrix      : PROJECTION;
+float fTime : TIME;
+
+texture2D NoiseMap < string ResourceName = HL_NOISE_FILE; >;
+sampler2D NoiseSamp = sampler_state {
+    Texture = <NoiseMap>;
+    MinFilter = LINEAR; MagFilter = LINEAR; MipFilter = LINEAR;
+    AddressU = WRAP; AddressV = WRAP;
+};
+
+struct VS_INPUT {
+    float4 Pos : POSITION;
+    float3 Normal : NORMAL;
+    float2 Tex : TEXCOORD0;
+};
+
+struct VS_OUTPUT {
+    float4 Pos : POSITION;
+    float2 Tex : TEXCOORD0;
+};
+
+// ==========================================================
+// 4. 顶点着色器
+// ==========================================================
+VS_OUTPUT VS_Main(VS_INPUT In) {
+    VS_OUTPUT Out = (VS_OUTPUT)0;
+    float4 pos = In.Pos;
+
+    // 整体晃动 (Wiggle)
+    float2 wUV = float2(fTime * WiggleSpeed * 0.1, fTime * WiggleSpeed * 0.15);
+    float4 noiseW = tex2Dlod(NoiseSamp, float4(wUV, 0, 0));
+    float2 wiggleOffset = (noiseW.rg - 0.5) * 2.0 * WigglePower;
+
+    // 边缘形变 (Tremble)
+    float2 tUV = In.Tex * NoiseTiling + float2(fTime * TrembleSpeed, fTime * TrembleSpeed * 0.8);
+    float4 noiseT = tex2Dlod(NoiseSamp, float4(tUV, 0, 0));
+    float2 trembleOffset = (noiseT.rg - 0.5) * 2.0 * TremblePower;
+
+    // 防穿模：位移限制在高光自身平面内，不沿眼球法线方向进出
+    float2 offset2 = wiggleOffset + trembleOffset;
+    float blink = saturate(max(max(MorphBlink, max(MorphWinkL, MorphWinkR)), max(MorphWinkL2, MorphWinkR2)));
+    offset2 *= 1.0 - blink * BlinkDamp;                    // 闭眼时抖动收回，避免穿出眼皮
+    float offLen = length(offset2);
+    if (MaxOffset > 0.0 && offLen > MaxOffset) offset2 *= MaxOffset / offLen;   // 幅度上限
+
+    float3 offset3 = float3(offset2, 0.0);
+    if (dot(In.Normal, In.Normal) > 1e-6) {
+        float3 n = normalize(In.Normal);
+        offset3 -= n * dot(offset3, n);                    // 去掉法线分量：转头/侧脸时不扎进眼球
+    }
+    pos.xyz += offset3;
+
+    float4 viewPos = mul(pos, WorldViewMatrix);
+    viewPos.xyz -= normalize(viewPos.xyz) * DepthBias;     // 沿视线拉近，屏幕位置不变
+    Out.Pos = mul(viewPos, ProjMatrix);
+    Out.Tex = In.Tex;
+    return Out;
+}
