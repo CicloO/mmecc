@@ -14,4 +14,4 @@ AdvancedMotionBlur 是 CicloO 制作的 MikuMikuEffect 动态模糊效果，适�
 - 只需要角色动作模糊时，将控制器的 `Camera Off` 设为 0.5 或更高。想单独关掉某个模型的镜头模糊时，在 MME 效果分配的 `GeometryData` 页为该模型分配 `ObjectMotion.fx`。
 - 修改 `Settings.fxh` 后重载效果。想恢复规则的残影，可把 `MB_SAMPLE_JITTER` 设为 0。
 
-详见 [参数手册](docs/PARAMETERS.md) 和 [更新记录](CHANGELOG.md)。
+详见 [参数手册](docs/PARAMETERS.md) 和 [更新记录](docs/CHANGELOG.md)。

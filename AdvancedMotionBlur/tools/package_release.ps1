@@ -28,7 +28,7 @@ foreach ($effect in $effects) {
     $entries.Add($effect, (Join-Path $source $effect))
 }
 $entries.Add('docs/PARAMETERS.md', (Join-Path $project 'docs/PARAMETERS.md'))
-$entries.Add('CHANGELOG.md', (Join-Path $project 'CHANGELOG.md'))
+$entries.Add('docs/CHANGELOG.md', (Join-Path $project 'docs/CHANGELOG.md'))
 
 foreach ($path in $entries.Values) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -40,8 +40,8 @@ if ($readmeTitle -ne "AdvancedMotionBlur  ver.$Version") {
     throw "Readme.txt version does not match $Version"
 }
 $changeHeading = '^## ' + [regex]::Escape($Version) + '(?![\d.])'
-if (-not (Select-String -LiteralPath $entries['CHANGELOG.md'] -Pattern $changeHeading -Quiet)) {
-    throw "CHANGELOG.md has no section for $Version"
+if (-not (Select-String -LiteralPath $entries['docs/CHANGELOG.md'] -Pattern $changeHeading -Quiet)) {
+    throw "docs/CHANGELOG.md has no section for $Version"
 }
 foreach ($effect in $effects | Where-Object { $_ -match '\.fxh?$' }) {
     foreach ($include in (Select-String -LiteralPath $entries[$effect] -Pattern '^\s*#\s*include\s+"([^"]+)"')) {
