@@ -8,6 +8,7 @@ Codex 与 Claude 的协作约定见 [CLAUDE.md](CLAUDE.md)。验证证据与后�
 
 | 路径 | 内容 |
 |---|---|
+| `Readme.txt` | 公开配布用说明（随 zip 附带） |
 | `src/` | `.x` 附件、着色器、头文件和可选的 PMX 控制器 |
 | `docs/` | [参数手册](docs/PARAMETERS.md)、验证记录和截图 |
 | `fixtures/` | 测试场景与动作 |

@@ -40,9 +40,10 @@
 git switch main
 git merge --no-ff AdvancedMotionBlur -m "AdvancedMotionBlur 0.2.0"
 git tag -a AdvancedMotionBlur/v0.2.0 -m "AdvancedMotionBlur 0.2.0"
-git archive --format=zip --prefix=MMD-AdvancedMotionBlur/ -o AdvancedMotionBlur/dist/MMD-AdvancedMotionBlur-0.2.0.zip AdvancedMotionBlur/v0.2.0:AdvancedMotionBlur README.md CHANGELOG.md src docs fixtures
+git archive --format=zip --prefix=MMD-AdvancedMotionBlur/ -o AdvancedMotionBlur/dist/MMD-AdvancedMotionBlur-0.2.0.zip AdvancedMotionBlur/v0.2.0:AdvancedMotionBlur Readme.txt CHANGELOG.md src docs/PARAMETERS.md
 git push origin main AdvancedMotionBlur/v0.2.0
 git switch AdvancedMotionBlur
 ```
 
-- 不创建 GitHub Release，zip 只保存在本地 `dist/`。zip 只含已提交的 `README.md`、`CHANGELOG.md`、`src/`、`docs/`、`fixtures/`，不含 `CLAUDE.md`、`tools/` 和本地测试文件。推送标签前先说明内容并得到用户确认。
+- 不创建 GitHub Release，zip 只保存在本地 `dist/`。zip 是公开配布包，只含已提交的 `Readme.txt`、`CHANGELOG.md`、`src/`、`docs/PARAMETERS.md`，不含开发用的 `README.md`、`CLAUDE.md`、`tools/`、`fixtures/`、其他 `docs/` 和本地测试文件。
+- 发布前同步：`Readme.txt` 的版本号和更新记录；仓库根目录 `README.md` 表格里的最新版和下载链接（`https://github.com/CicloO/mmecc/archive/refs/tags/AdvancedMotionBlur/v<版本>.zip`）。控制器 PMX 的简介写在 `tools/build_controller.py` 的 `COMMENT_LOCAL`／`COMMENT_ENGLISH`，改表情时一起改。推送标签前先说明内容并得到用户确认。
