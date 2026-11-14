@@ -22,7 +22,7 @@ $all = @{
 $cases = @(
     @{ Name = 'default'; Set = @{} },
     @{ Name = 'streaks'; Set = @{ MB_SAMPLE_JITTER = '0' } },
-    @{ Name = 'soft1'; Set = @{ MB_STREAK_SOFTNESS = '1.0' } },
+    @{ Name = 'soft0'; Set = @{ MB_STREAK_SOFTNESS = '0.0' } },
     @{ Name = 'q0'; Set = @{ MB_QUALITY = '0' } },
     @{ Name = 'q2'; Set = @{ MB_QUALITY = '2' } },
     @{ Name = 'q3'; Set = @{ MB_QUALITY = '3' } },

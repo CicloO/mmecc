@@ -21,7 +21,7 @@ MORPHS = (
     ("Camera -", 3),
     ("Force Cut", 3),
     ("Keep Camera", 3),
-    ("Gaussian", 4),
+    ("Gaussian Off", 4),
     ("Jitter Off", 4),
 )
 
@@ -40,7 +40,7 @@ COMMENT_LOCAL = "\r\n".join((
     "【口・镜头】Camera +／-：只调镜头运动造成的模糊，最多加倍／降到 0（Camera - 为 1 时只剩角色自身动作的模糊）",
     "【口・镜头】Force Cut：≥0.5 时该帧按切镜处理",
     "【口・镜头】Keep Camera：≥0.5 时不做自动切镜判定",
-    "【他・拖影样式】Gaussian：拖影从均匀渐变为两端柔和淡出的高斯分布（3L 的观感）",
+    "【他・拖影样式】Gaussian Off：拖影从两端柔和淡出的高斯分布（默认）渐变为均匀拖影",
     "【他・拖影样式】Jitter Off：≥0.5 时把颗粒状拖影换成规则的残影状拖影",
 ))
 
@@ -54,7 +54,7 @@ COMMENT_ENGLISH = "\r\n".join((
     "[Mouth: camera] Camera +/-: camera-motion blur only, up to 2x / down to 0 (Camera - at 1 keeps only object motion blur)",
     "[Mouth: camera] Force Cut: >= 0.5 treats the frame as a camera cut",
     "[Mouth: camera] Keep Camera: >= 0.5 disables automatic cut detection",
-    "[Other: streak style] Gaussian: streak fades from even to a Gaussian with soft ends (MotionBlur3L look)",
+    "[Other: streak style] Gaussian Off: streak fades from the default Gaussian with soft ends to an even streak",
     "[Other: streak style] Jitter Off: >= 0.5 uses regular ghost streaks instead of grainy trails",
 ))
 

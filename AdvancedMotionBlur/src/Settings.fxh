@@ -19,7 +19,7 @@
 #define MB_TRAIL_SPREAD 0.35       // Outer trail width grows by this per px of distance; 0: 0.2.0
 #define MB_LINEAR_COLOR 1          // 0: point-sampled trail colour (0.2.0)
 #define MB_LINEAR_LIGHT 1          // 1: accumulate trail colour in linear light (brighter trails over dark areas)
-#define MB_STREAK_SOFTNESS 0.0     // 0: even streak with hard ends; 1: Gaussian falloff toward both ends (MotionBlur3L look)
+#define MB_STREAK_SOFTNESS 1.0     // 1: Gaussian falloff toward both ends (MotionBlur3L look, default); 0: even streak with hard ends
 #define MB_SAMPLE_JITTER 1        // 1: taps shifted by a fixed per-pixel phase (grainy); 0: regular ghost streaks
 #define MB_EDGE_BACKGROUND 1     // 0: inner side of moving silhouettes stays opaque (0.2.0)
 #define MB_OUTLINE_SEARCH 3        // Px searched around native outline pixels for surface motion

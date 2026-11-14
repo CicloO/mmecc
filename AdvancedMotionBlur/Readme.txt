@@ -1,4 +1,4 @@
-AdvancedMotionBlur  ver.0.4
+AdvancedMotionBlur  ver.0.4.1
 作者  CicloO
 
 ■ 简介
@@ -31,7 +31,7 @@ DirectX 9.0c（June 2010）运行库
   口（镜头）    Camera + / -     只增减镜头运动造成的模糊，角色自身动作不变；Camera - 为 1 时只剩角色自身动作的模糊
                 Force Cut        按切镜处理当前帧
                 Keep Camera      沿用镜头运动历史
-  其他（样式）  Gaussian         拖影改为两端柔和淡出的高斯分布
+  其他（样式）  Gaussian Off     拖影从两端柔和淡出的高斯分布（默认）改为均匀拖影
                 Jitter Off       颗粒状拖影改为规则的残影状拖影
 
 Force Cut、Keep Camera、Jitter Off 在权重达到 0.5 时生效。
@@ -60,7 +60,7 @@ NoMotionBlur.fx 不记录该对象的顶点历史，也不计算它的拖影速�
   MB_SHUTTER_ANGLE       快门角，默认 180°，以 30 fps 的一帧为基准。
   MB_MAX_STREAK          拖影长度上限，默认 64 px，以 1080p 为基准。
   MB_SPEED_THRESHOLD     速度死区，默认 3 px，以 1080p 为基准。
-  MB_STREAK_SOFTNESS     0 为均匀拖影（默认），1 为两端柔和淡出的高斯分布。也可用 Gaussian 表情调节。
+  MB_STREAK_SOFTNESS     1 为两端柔和淡出的高斯分布（默认），0 为均匀拖影。也可用 Gaussian Off 表情按段调节。
   MB_SAMPLE_JITTER       1 为采样抖动（默认），0 为固定采样。也可用 Jitter Off 表情按段切换。
   MB_TRANSLUCENT_MOTION  1 时半透明和加法（发光）材质也一起模糊（默认），0 保持清晰。
   MB_LINEAR_LIGHT        1 在线性光空间混合拖影（默认），亮色拖过暗处更自然。
@@ -82,5 +82,6 @@ NoMotionBlur.fx 不记录该对象的顶点历史，也不计算它的拖影速�
 
 ■ 更新记录
 
+0.4.1  高斯拖影改为默认开启，控制器的 Gaussian 改为 Gaussian Off。
 0.4    修正舞台背向镜头的墙挡住几何缓冲、导致镜头模糊被放大数倍的问题；半透明和加法材质、后期描线与描边随物体一起模糊；新增 Camera ± 和 Gaussian 表情（Camera Off 并入 Camera -），控制器按用途分栏；默认开启线性光；MB_QUALITY 新增固定 8／16／24 点采样。详见 docs/CHANGELOG.md。
 0.3.0  新增仅模型动作模糊和 Camera Off 表情，改进切镜处理，默认开启采样抖动，修正快速前景附近背景拖影成块消失的问题。
