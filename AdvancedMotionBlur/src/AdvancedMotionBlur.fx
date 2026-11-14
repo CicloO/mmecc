@@ -119,8 +119,10 @@ float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
         return 0.0;
     }
     float2 delta;
+    // Controller "Camera Off": blur only from objects' own motion, like a cut frame.
+    bool cameraOff = ControllerWeight(ControlCameraOff) >= 0.5;
 #if MB_KEEP_OBJECT_MOTION_ON_CUT
-    if (camera.w > 0.5) {
+    if (camera.w > 0.5 || cameraOff) {
         float2 sampleUV = uv + 0.5 / ScreenSize;
         float4 localMotion = tex2Dlod(CutMotionSampler, float4(sampleUV, 0.0, 0.0));
         delta = localMotion.a > 0.5 && abs(localMotion.b - geometry.b) < 0.002 ? localMotion.rg : 0.0;
@@ -133,7 +135,8 @@ float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
         float motionCoverage = geometry.a;
 #endif
 #if MB_CAMERA_MOTION
-        delta = HasModelMotion(motionCoverage, dt) ? geometry.rg : CameraDisplacement(uv, geometry.b);
+        delta = HasModelMotion(motionCoverage, dt) ? geometry.rg
+            : (cameraOff ? 0.0 : CameraDisplacement(uv, geometry.b));
 #else
         delta = HasModelMotion(motionCoverage, dt) ? geometry.rg : 0.0;
 #endif

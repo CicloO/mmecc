@@ -48,6 +48,7 @@ P1 会把快速前景的拖尾延伸到轮廓外，可覆盖空白底色或较�
 | 口 | `Streak +/−` 调拖影上限 |
 | 其他 | `Threshold` 加大速度死区：动得慢的部分保持清晰，只模糊快速动作 |
 | 其他 | `Force Cut` 强制切镜，`Keep Camera` 强制沿用相机历史 |
+| 其他 | `Camera Off` 关闭镜头运动模糊，只保留模型自身动作的模糊（可按段落注册关键帧） |
 
 全部表情为 0 时沿用 `Settings.fxh` 和附件 Si。快门角按 30 fps 的一帧计算，与导出帧率无关：30 和 60 fps 导出的拖影长度相同。P1 轮廓外拖尾和描边修正不在控制器里，用 `Settings.fxh` 的 `MB_EXTEND_FOREGROUND`、`MB_OUTLINE_MOTION` 开关。参数范围和注册说明见 [参数手册](docs/PARAMETERS.md#pmx-实时控制器)。
 

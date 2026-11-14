@@ -15,6 +15,7 @@ MORPHS = (
     ("Threshold", 4),
     ("Force Cut", 4),
     ("Keep Camera", 4),
+    ("Camera Off", 4),
 )
 
 
