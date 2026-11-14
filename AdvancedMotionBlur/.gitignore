@@ -5,8 +5,15 @@ test/*.avi
 *.pmm
 *.emm
 
-# Release zips are built at release time and attached to GitHub Releases
+# Distribution packages and backups
 dist/
+
+# Local collaboration and validation records
+/CLAUDE.md
+/docs/HANDOFF.md
+/docs/ROADMAP.md
+/docs/VALIDATION.md
+/docs/validation/
 
 # Compiled effects and Python caches
 *.fxo
