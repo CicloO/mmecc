@@ -169,6 +169,10 @@ static const float DepthTolerance = max(MB_DEPTH_TOLERANCE, 0.0001);
 float TrailTapPhase(float2 uv)
 {
 #if MB_SAMPLE_JITTER && MB_DEBUG == 0
+    // Controller "Jitter Off" switches back to regular ghost streaks.
+    if (ControllerWeight(ControlJitterOff) >= 0.5) {
+        return 0.5;
+    }
     // Use a stable screen-space phase for all taps at a pixel. Keeping their
     // spacing also keeps dense outer trails from skipping pixels.
     float2 pixel = floor(uv * ScreenSize);

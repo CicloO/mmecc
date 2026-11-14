@@ -34,8 +34,9 @@ DirectX 9.0c（June 2010）运行库
         Force Cut        按切镜处理当前帧
         Keep Camera      沿用镜头运动历史
         Camera Off       关闭镜头模糊
+        Jitter Off       颗粒状拖影改为规则的残影状拖影
 
-最后三项在权重达到 0.5 时生效。Force Cut 优先于 Keep Camera。
+最后四项在权重达到 0.5 时生效。Force Cut 优先于 Keep Camera。
 
 ■ 按对象设置模糊
 
@@ -63,7 +64,9 @@ MB_CAMERA_MOTION 设为 0。
   MB_SHUTTER_ANGLE    快门角，默认 180°，以 30 fps 的一帧为基准。
   MB_MAX_STREAK       拖影长度上限，默认 64 px，以 1080p 为基准。
   MB_SPEED_THRESHOLD  速度死区，默认 3 px，以 1080p 为基准。
-  MB_SAMPLE_JITTER    1 为采样抖动（默认），0 为固定采样。
+  MB_SAMPLE_JITTER    1 为采样抖动（默认），0 为固定采样。也可用 Jitter Off 表情按段切换。
+  MB_TRANSLUCENT_MOTION  1 时半透明和加法（发光）材质也一起模糊（默认），0 保持清晰。
+  MB_LINEAR_LIGHT     1 在线性光空间混合拖影（默认），亮色拖过暗处更自然。
   MB_QUALITY          0／1／2 为低／中／高（默认 1），3 为固定 16 点采样。
 
 全部参数及附加选项见 docs/PARAMETERS.md。

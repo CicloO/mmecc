@@ -16,6 +16,7 @@ MORPHS = (
     ("Force Cut", 4),
     ("Keep Camera", 4),
     ("Camera Off", 4),
+    ("Jitter Off", 4),
 )
 
 
@@ -29,6 +30,7 @@ COMMENT_LOCAL = "\r\n".join((
     "Force Cut：≥0.5 时该帧按切镜处理",
     "Keep Camera：≥0.5 时不做自动切镜判定",
     "Camera Off：≥0.5 时关闭镜头运动模糊，只保留角色自身动作的模糊",
+    "Jitter Off：≥0.5 时把颗粒状拖影换成规则的残影状拖影",
 ))
 
 COMMENT_ENGLISH = "\r\n".join((
@@ -41,6 +43,7 @@ COMMENT_ENGLISH = "\r\n".join((
     "Force Cut: >= 0.5 treats the frame as a camera cut",
     "Keep Camera: >= 0.5 disables automatic cut detection",
     "Camera Off: >= 0.5 removes camera-motion blur, keeps object motion blur",
+    "Jitter Off: >= 0.5 uses regular ghost streaks instead of grainy trails",
 ))
 
 

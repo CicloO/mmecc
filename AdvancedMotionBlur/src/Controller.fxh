@@ -15,6 +15,7 @@ MB_MORPH_WEIGHT(ControlThreshold, "Threshold")
 MB_MORPH_WEIGHT(ControlForceCut, "Force Cut")
 MB_MORPH_WEIGHT(ControlKeepCamera, "Keep Camera")
 MB_MORPH_WEIGHT(ControlCameraOff, "Camera Off")
+MB_MORPH_WEIGHT(ControlJitterOff, "Jitter Off")
 
 #undef MB_MORPH_WEIGHT
 

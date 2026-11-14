@@ -228,10 +228,8 @@ float4 SurfaceDepth(GeometryOutput input)
     return float4(0.0, 0.0, depth, ExcludedCoverage);
 #else
 #if MB_TRANSLUCENT_MOTION
-    if (opadd) {
-        return float4(0.0, 0.0, depth, AdditiveCoverage);
-    }
-    float coverage = alpha >= 0.985 ? 1.0 : -1.0;
+    // Additive glows blur on their own layer like ordinary alpha materials.
+    float coverage = (alpha >= 0.985 && !opadd) ? 1.0 : -1.0;
 #else
     float coverage = (alpha >= 0.985 && !opadd) ? 1.0 : 3.0;
 #endif

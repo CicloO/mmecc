@@ -2,6 +2,12 @@
 
 标签格式为 `AdvancedMotionBlur/v<版本>`。
 
+## 未发布
+
+- 半透明和加法（发光）材质默认参与模糊（`MB_TRANSLUCENT_MOTION 1`）：链子、饰品、发光片不再在周围都糊了时保持清晰。设为 0 恢复原样。
+- 线性光混合默认开启（`MB_LINEAR_LIGHT 1`）。
+- 控制器其他栏新增 `Jitter Off`：权重 ≥0.5 时把颗粒状拖影换成规则的残影状拖影，可按段落注册。
+
 ## 0.3.0（2026-11-14）
 
 - 新增 `NoMotionBlur.fx`。在 `GeometryData` 为指定对象保留深度遮挡，并跳过其拖影速度和历史记录。`MB_EXCLUDED_ACCESSORY_RULES` 可为指定文件名的附件设置默认分配。

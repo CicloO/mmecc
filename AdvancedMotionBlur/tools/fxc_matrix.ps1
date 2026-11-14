@@ -48,6 +48,8 @@ $cases = @(
     @{ Name = 'excluded'; Set = @{ MB_EXCLUDED_ACCESSORY_RULES = '"MyEffect.x=NoMotionBlur.fx;"'; MB_ACCESSORY_MOTION = '1' } },
     @{ Name = 'rigidclip'; Set = @{ MB_ACCESSORY_MOTION = '1'; MB_KEEP_OBJECT_MOTION_ON_CUT = '0' } },
     @{ Name = 'all'; Set = $all },
+    @{ Name = 'notranslucent'; Set = @{ MB_TRANSLUCENT_MOTION = '0' } },
+    @{ Name = 'nolinearlight'; Set = @{ MB_LINEAR_LIGHT = '0' } },
     @{ Name = 'linearlight'; Set = @{ MB_LINEAR_LIGHT = '1' } },
     @{ Name = 'linearlightp0'; Set = @{ MB_LINEAR_LIGHT = '1'; MB_EXTEND_FOREGROUND = '0' } },
     @{ Name = 'linearlightall'; Set = $all + @{ MB_LINEAR_LIGHT = '1' } },
