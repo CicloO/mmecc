@@ -22,7 +22,7 @@
 - `docs/VALIDATION.md`：技术依据、已有证据、复现场景和后续计划。
 - `src/`：运行文件（`.x`、`.fx`、`.fxh` 须同目录）和 PMX 控制器。
 - `tools/build_controller.py`：重新生成 PMX 控制器；修改表情名时同步 `src/Controller.fxh`。
-- `tools/fxc_matrix.ps1`：FXC 编译矩阵（各开关组合 × 3 个效果）；`tools/d3dx_compile_time.py`：用 MME 实际使用的 `d3dx9_43` 计编译时间，载入速度以它为准。
+- `tools/fxc_matrix.ps1`：FXC 编译矩阵（各开关组合 × 5 个效果）；`tools/d3dx_compile_time.py`：用 MME 实际使用的 `d3dx9_43` 计编译时间，载入速度以它为准。
 - `docs/HANDOFF.md`：当前的交接单（保护基准版本的做法、任务顺序、检查方法和已知的坑）。
 - `docs/PARAMETERS.md`：参数手册与控制器表情说明。
 - `docs/ROADMAP.md`：后续计划书（画面问题清单、分阶段方案和验收标准）。
