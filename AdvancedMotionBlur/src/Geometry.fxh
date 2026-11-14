@@ -224,6 +224,9 @@ float4 SurfaceDepth(GeometryOutput input)
     float alpha = MaterialCoverage(input.uv);
     clip(alpha - 0.004);
     float depth = log2(max(input.viewDepth, 0.0001));
+#if MB_EXCLUDE_FROM_BLUR
+    return float4(0.0, 0.0, depth, ExcludedCoverage);
+#else
 #if MB_TRANSLUCENT_MOTION
     if (opadd) {
         return float4(0.0, 0.0, depth, AdditiveCoverage);
@@ -243,6 +246,7 @@ float4 SurfaceDepth(GeometryOutput input)
     }
 #endif
     return float4(0.0, 0.0, depth, coverage);
+#endif
 }
 
 #if MB_KEEP_OBJECT_MOTION_ON_CUT
@@ -421,7 +425,7 @@ technique GeometrySS < string MMDPass = "object_ss"; > { pass WriteGeometry { MB
 #endif
 #endif
 
-#if MB_EXTEND_FOREGROUND && MB_OUTLINE_MOTION
+#if (MB_EXTEND_FOREGROUND && MB_OUTLINE_MOTION) || MB_EXCLUDE_FROM_BLUR
 float4 OutlineColor : EDGECOLOR;
 
 struct OutlineOutput {
@@ -441,7 +445,11 @@ OutlineOutput ProjectOutline(float4 position : POSITION)
 float4 OutlineSurfaceDepth(OutlineOutput input)
 {
     clip(OutlineColor.a - 0.004);
+#if MB_EXCLUDE_FROM_BLUR
+    float coverage = ExcludedCoverage;
+#else
     float coverage = OutlineColor.a >= 0.985 ? 4.0 : 3.0;
+#endif
     return float4(0.0, 0.0, log2(max(input.viewDepth, 0.0001)), coverage);
 }
 

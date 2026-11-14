@@ -49,7 +49,7 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
     offset = 0.0;
     coverage = center.a;
     float4 resolved = center;
-    if (IsOrdinaryTranslucent(center.a) || IsAdditive(center.a)) {
+    if (IsOrdinaryTranslucent(center.a) || IsAdditive(center.a) || center.a == ExcludedCoverage) {
         return resolved;
     }
     float2 texel = 1.0 / ScreenSize;
@@ -86,7 +86,7 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
         float4 neighbor = tex2Dlod(GeometrySampler, float4(uv + step * texel, 0.0, 0.0));
         bool behind = center.a <= 0.0 || center.b - neighbor.b > DepthTolerance;
         bool sameLayer = abs(center.b - neighbor.b) <= 2.0 * DepthTolerance;
-        if (!touchesOutline && neighbor.a > 3.5 && !IsAdditive(neighbor.a) &&
+        if (!touchesOutline && neighbor.a > 3.5 && !IsProtectedSurface(neighbor.a) &&
             (translucent ? (behind || sameLayer) : behind)) {
             touchesOutline = true;
             outlineDepth = neighbor.b;

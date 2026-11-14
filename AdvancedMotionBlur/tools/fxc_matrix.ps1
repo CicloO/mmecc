@@ -45,6 +45,7 @@ $cases = @(
     @{ Name = 'translucent'; Set = @{ MB_TRANSLUCENT_MOTION = '1' } },
     @{ Name = 'translucentp0'; Set = @{ MB_TRANSLUCENT_MOTION = '1'; MB_EXTEND_FOREGROUND = '0' } },
     @{ Name = 'rigid'; Set = @{ MB_ACCESSORY_MOTION = '1' } },
+    @{ Name = 'excluded'; Set = @{ MB_EXCLUDED_ACCESSORY_RULES = '"MyEffect.x=NoMotionBlur.fx;"'; MB_ACCESSORY_MOTION = '1' } },
     @{ Name = 'rigidclip'; Set = @{ MB_ACCESSORY_MOTION = '1'; MB_KEEP_OBJECT_MOTION_ON_CUT = '0' } },
     @{ Name = 'all'; Set = $all },
     @{ Name = 'linearlight'; Set = @{ MB_LINEAR_LIGHT = '1' } },
@@ -62,7 +63,7 @@ $cases = @(
     @{ Name = 'thresh8'; Set = @{ MB_SPEED_THRESHOLD = '8.0' } },
     @{ Name = 'legacy020'; Set = @{ MB_SHUTTER_ANGLE = '180.0'; MB_MOTION_SCALE = '1.0'; MB_MAX_STREAK = '48.0'; MB_SPEED_THRESHOLD = '0.0'; MB_SCALE_STREAK_WITH_HEIGHT = '0'; MB_SAMPLE_JITTER = '0'; MB_KEEP_OBJECT_MOTION_ON_CUT = '0' } }
 )
-$effects = @('AdvancedMotionBlur.fx', 'DepthVelocity.fx', 'MotionGeometry.fx', 'ObjectMotion.fx', 'RigidMotion.fx')
+$effects = @('AdvancedMotionBlur.fx', 'DepthVelocity.fx', 'MotionGeometry.fx', 'ObjectMotion.fx', 'RigidMotion.fx', 'NoMotionBlur.fx')
 $fail = 0
 foreach ($case in $cases) {
     $dir = Join-Path $Work $case.Name

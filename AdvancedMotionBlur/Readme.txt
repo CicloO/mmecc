@@ -3,8 +3,8 @@ AdvancedMotionBlur  ver.0.3.0
 
 ■ 简介
 
-适用于 MikuMikuEffect 的动态模糊。支持镜头运动和模型自身动作。
-固定镜头下，挥手、转身等动作也有拖影。
+适用于 MikuMikuEffect 的动态模糊，参考了游戏引擎和Eevee里的运动模糊效果进行实现。
+支持镜头运动和模型自身动作，并提供fx分配。
 
 ■ 运行环境
 
@@ -44,6 +44,14 @@ DirectX 9.0c（June 2010）运行库
   MotionGeometry.fx  镜头运动和模型动作（PMX／PMD 默认）
   DepthVelocity.fx   镜头运动（场景附件默认）
   ObjectMotion.fx    仅模型自身动作
+  NoMotionBlur.fx    对象保持清晰，保留其深度遮挡
+
+NoMotionBlur.fx 不记录该对象的顶点历史，也不计算它的拖影速度。分配到
+GeometryData 页即可，Main 页保留原材质。
+
+要让指定的效果附件默认使用 NoMotionBlur.fx，可在 Settings.fxh 里按文件名设置
+MB_EXCLUDED_ACCESSORY_RULES，例如 "MyEffect.x = NoMotionBlur.fx;"。
+多个文件用分号隔开。重载后，已有手动映射的工程仍需检查 GeometryData。
 
 全场景只保留模型动作模糊时，可使用 Camera Off，或将 Settings.fxh 中的
 MB_CAMERA_MOTION 设为 0。
@@ -71,8 +79,8 @@ MB_CAMERA_MOTION 设为 0。
 ■ 使用条件
 
 ・个人和商业视频均可免费使用，无需事先联系作者。
-・署名可选。若署名，请写「AdvancedMotionBlur / CicloO」。
-・允许修改后自用。原版和修改版均禁止再分发。
+・署名可选。若署名，请写「CicloO」或「AdvancedMotionBlur / CicloO」。
+・允许修改后自用。禁止再配布，请直接在GitHub上pr或联系作者。
 ・作者不承担因使用本效果产生的责任。
 
 ■ 更新记录
