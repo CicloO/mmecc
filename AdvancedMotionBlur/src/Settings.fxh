@@ -13,12 +13,12 @@
 #define MB_MAX_FRAME_GAP 0.1001    // Seconds, including a 3-frame gap at 30 fps
 #define MB_CLEAR_RGBA 1.0, 1.0, 1.0, 0.0
 #define MB_TRAIL_ALPHA 0           // 1: capture and output premultiplied RGBA for transparent export
-#define MB_TRANSLUCENT_MOTION 0   // 1: blur ordinary alpha materials on their own depth layer
+#define MB_TRANSLUCENT_MOTION 1   // 1: alpha and additive materials blur on their own depth layer; 0: they stay sharp
 #define MB_DEBUG 0                 // 0: result; 1: source; 2: motion; 3: depth; 4: coverage
 #define MB_EXTEND_FOREGROUND 1     // 0: use the P0 within-surface blur
 #define MB_TRAIL_SPREAD 0.35       // Outer trail width grows by this per px of distance; 0: 0.2.0
 #define MB_LINEAR_COLOR 1          // 0: point-sampled trail colour (0.2.0)
-#define MB_LINEAR_LIGHT 0          // 1: accumulate trail colour in linear light (brighter trails over dark areas)
+#define MB_LINEAR_LIGHT 1          // 1: accumulate trail colour in linear light (brighter trails over dark areas)
 #define MB_SAMPLE_JITTER 1         // 1: taps shifted by a fixed per-pixel phase (grainy); 0: regular ghost streaks
 #define MB_EDGE_BACKGROUND 1     // 0: inner side of moving silhouettes stays opaque (0.2.0)
 #define MB_OUTLINE_SEARCH 3        // Px searched around native outline pixels for surface motion
