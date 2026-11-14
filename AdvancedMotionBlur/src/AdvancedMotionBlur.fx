@@ -1,8 +1,26 @@
 #include "Settings.fxh"
 #include "Fullscreen.fxh"
+#include "ModelTiming.fxh"
+#include "Coverage.fxh"
+
+float2 ScreenSize : VIEWPORTPIXELSIZE;
+
+float StreakPixelScale()
+{
+#if MB_SCALE_STREAK_WITH_HEIGHT
+    return ScreenSize.y / 1080.0;
+#else
+    return 1.0;
+#endif
+}
+
 #include "Controller.fxh"
+#include "HistoryTargets.fxh"
 
 #define MB_USE_FOREGROUND (MB_EXTEND_FOREGROUND && MB_DEBUG == 0)
+#define MB_USE_TRAIL_ALPHA (MB_TRAIL_ALPHA && MB_DEBUG == 0)
+#define MB_USE_LINEAR_LIGHT (MB_LINEAR_LIGHT && MB_DEBUG == 0)
+#include "LinearLight.fxh"
 
 float Script : STANDARDSGLOBAL <
     string ScriptOutput = "color";
@@ -10,7 +28,6 @@ float Script : STANDARDSGLOBAL <
     string ScriptOrder = "postprocess";
 > = 0.8;
 
-float2 ScreenSize : VIEWPORTPIXELSIZE;
 float4x4 ViewProjection : VIEWPROJECTION;
 float4x4 InverseViewProjection : VIEWPROJECTIONINVERSE;
 float4x4 View : VIEW;
@@ -18,17 +35,23 @@ float4x4 Projection : PROJECTION;
 float Timeline : TIME < bool SyncInEditMode = true; >;
 float AccessoryScale : CONTROLOBJECT < string name = "(self)"; >;
 
+#if MB_USE_TRAIL_ALPHA
+static const float4 ClearColor = {MB_CLEAR_RGBA};
+float4 SceneClear = float4(ClearColor.rgb * ClearColor.a, ClearColor.a);
+#else
 float4 SceneClear = {MB_CLEAR_RGBA};
+#endif
 float DepthClear = 1.0;
 
 texture SceneColor : RENDERCOLORTARGET < string Format = "A8R8G8B8"; >;
 texture SceneDepth : RENDERDEPTHSTENCILTARGET;
-texture CameraState : RENDERCOLORTARGET <
-    int Width = 8;
+texture CameraDepth : RENDERDEPTHSTENCILTARGET < int Width = 8; int Height = 1; >;
+texture CameraAnalysis : RENDERCOLORTARGET <
+    int Width = 1;
     int Height = 1;
     string Format = "A32B32G32R32F";
 >;
-texture CameraDepth : RENDERDEPTHSTENCILTARGET < int Width = 8; int Height = 1; >;
+texture AnalysisDepth : RENDERDEPTHSTENCILTARGET < int Width = 1; int Height = 1; >;
 
 texture GeometryData : OFFSCREENRENDERTARGET <
     string Description = "AdvancedMotionBlur - depth and motion";
@@ -43,6 +66,9 @@ texture GeometryData : OFFSCREENRENDERTARGET <
         "*.pmx = MotionGeometry.fx;"
         "*.pmd = MotionGeometry.fx;"
 #endif
+#if MB_ACCESSORY_MOTION
+        "*.x = RigidMotion.fx;"
+#endif
         "* = DepthVelocity.fx;";
 >;
 
@@ -50,73 +76,29 @@ texture GeometryData : OFFSCREENRENDERTARGET <
     MinFilter = POINT; MagFilter = POINT; MipFilter = NONE; \
     AddressU = CLAMP; AddressV = CLAMP; SRGBTexture = FALSE;
 sampler2D SceneSampler = sampler_state { Texture = <SceneColor>; MB_POINT_FILTER };
-sampler2D CameraSampler = sampler_state { Texture = <CameraState>; MB_POINT_FILTER };
+
+#ifndef MB_LINEAR_COLOR
+#define MB_LINEAR_COLOR 1
+#endif
+// Trail taps land between pixels. Filtering their colour lets a thin, slanted
+// outline fade evenly instead of flipping between line and background.
+// Geometry stays point-sampled so depth and coverage tests are not blended.
+sampler2D SceneTapSampler = sampler_state {
+    Texture = <SceneColor>;
+#if MB_LINEAR_COLOR
+    MinFilter = LINEAR; MagFilter = LINEAR;
+#else
+    MinFilter = POINT; MagFilter = POINT;
+#endif
+    MipFilter = NONE; AddressU = CLAMP; AddressV = CLAMP; SRGBTexture = FALSE;
+};
+sampler2D CameraSampler = sampler_state { Texture = <AMB_CameraHistory>; MB_POINT_FILTER };
+sampler2D AnalysisSampler = sampler_state { Texture = <CameraAnalysis>; MB_POINT_FILTER };
 sampler2D GeometrySampler = sampler_state { Texture = <GeometryData>; MB_POINT_FILTER };
-
-float3 CameraForward()
-{
-    return float3(View[0][2], View[1][2], View[2][2]);
-}
-
-float3 CameraUp()
-{
-    return float3(View[0][1], View[1][1], View[2][1]);
-}
-
-float4 StoreCamera(float2 quadUV : TEXCOORD0) : COLOR0
-{
-    int slot = (int)(quadUV.x * 8.0 + 0.5);
-    if (slot < 4) {
-        return ViewProjection[slot];
-    }
-    if (slot == 4) {
-        return float4(Timeline, ScreenSize, 319.25);
-    }
-    if (slot == 5) {
-        return float4(CameraForward(), Projection[1][1]);
-    }
-    return float4(CameraUp(), Projection[2][3]);
-}
-
-float4 PreviousCamera(float slot)
-{
-    return tex2Dlod(CameraSampler, float4((slot + 0.5) / 8.0, 0.5, 0.0, 0.0));
-}
-
-float CameraInterval()
-{
-    float4 timing = PreviousCamera(4.0);
-    float dt = Timeline - timing.x;
-    if (timing.w != 319.25 || any(abs(timing.yz - ScreenSize) > 0.5)
-        || !(dt > 0.001 && dt <= MB_MAX_FRAME_GAP)) {
-        return 0.0;
-    }
-    float4 previousForward = PreviousCamera(5.0);
-    float4 previousUp = PreviousCamera(6.0);
-    float zoomRatio = Projection[1][1] / max(previousForward.w, 0.0001);
-    if (dot(previousForward.xyz, CameraForward()) < MB_CUT_ANGLE_COS
-        || dot(previousUp.xyz, CameraUp()) < MB_CUT_ANGLE_COS
-        || zoomRatio < 0.75 || zoomRatio > 1.33
-        || abs(previousUp.w - Projection[2][3]) > 0.5) {
-        return 0.0;
-    }
-    return dt;
-}
-
-float2 CameraDisplacement(float2 uv, float logDepth)
-{
-    float depth = exp2(logDepth);
-    float4 projectionZW = mul(float4(0.0, 0.0, depth, 1.0), Projection);
-    float2 ndc = (uv * 2.0 - 1.0) * float2(1.0, -1.0);
-    float4 currentClip = float4(ndc * projectionZW.w, projectionZW.zw);
-    float4 world = mul(currentClip, InverseViewProjection);
-    float4 oldClip = mul(world, float4x4(
-        PreviousCamera(0.0), PreviousCamera(1.0), PreviousCamera(2.0), PreviousCamera(3.0)));
-    if (oldClip.w < 0.0001) {
-        return 0.0;
-    }
-    return (ndc - oldClip.xy / oldClip.w) * float2(0.5, -0.5) * ScreenSize;
-}
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+sampler2D CutMotionSampler = sampler_state { Texture = <AMB_CutMotion>; MB_POINT_FILTER };
+float4 CutMotionClear = {0.0, 0.0, 0.0, 0.0};
+#endif
 
 // Shutter angles refer to a 30 fps frame. Screen velocity is measured per
 // second, so the streak length does not depend on the export frame rate.
@@ -128,57 +110,154 @@ float ExposureScale()
     return MotionShutter() * strength / ShutterReferenceFps;
 }
 
-float2 ExposureStreak(float2 uv, float4 geometry, float dt, float exposure)
+#include "Camera.fxh"
+
+float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
 {
-    if (dt <= 0.0 || geometry.a < 0.5 || geometry.a > 2.5) {
+    float dt = CameraBlurInterval(camera);
+    if (dt <= 0.0 || !HasGeometryCoverage(geometry.a) || geometry.a > 2.5) {
         return 0.0;
     }
-    float2 delta = geometry.a > 1.5 ? geometry.rg : CameraDisplacement(uv, geometry.b);
+    float2 delta;
+    // Controller "Camera Off": blur only from objects' own motion, like a cut frame.
+    bool cameraOff = ControllerWeight(ControlCameraOff) >= 0.5;
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+    if (camera.w > 0.5 || cameraOff) {
+        float2 sampleUV = uv + 0.5 / ScreenSize;
+        float4 localMotion = tex2Dlod(CutMotionSampler, float4(sampleUV, 0.0, 0.0));
+        delta = localMotion.a > 0.5 && abs(localMotion.b - geometry.b) < 0.002 ? localMotion.rg : 0.0;
+    } else
+#endif
+    {
+#if MB_TRANSLUCENT_MOTION
+        float motionCoverage = abs(geometry.a);
+#else
+        float motionCoverage = geometry.a;
+#endif
+#if MB_CAMERA_MOTION
+        delta = HasModelMotion(motionCoverage, dt) ? geometry.rg
+            : (cameraOff ? 0.0 : CameraDisplacement(uv, geometry.b));
+#else
+        delta = HasModelMotion(motionCoverage, dt) ? geometry.rg : 0.0;
+#endif
+    }
     float distance = length(delta);
     if (!(distance >= 0.01 && distance < length(ScreenSize) * 0.65)) {
         return 0.0;
     }
-    float extent = min(MotionStreakLimit(), distance * exposure / dt);
+    // Dead zone: slow parts lose their whole streak, fast parts lose the same
+    // length, so the transition stays continuous (no popping at the edge).
+    float extent = max(0.0, distance * camera.y / dt - MotionSpeedThreshold());
+    extent = min(MotionStreakLimit(), extent);
     return delta * (extent / distance);
 }
 
-static const float MinStreak = 0.75;
+float MinStreak()
+{
+    return 0.75 * StreakPixelScale();
+}
+
+float StreakTapBudget(float referenceTaps)
+{
+    // Leave room for high-resolution taps within the ps_3_0 loop limit.
+    return min(255.0, ceil(referenceTaps * max(1.0, StreakPixelScale())));
+}
+
 static const float DepthTolerance = max(MB_DEPTH_TOLERANCE, 0.0001);
+
+float TrailTapPhase(float2 uv)
+{
+#if MB_SAMPLE_JITTER && MB_DEBUG == 0
+    // Use a stable screen-space phase for all taps at a pixel. Keeping their
+    // spacing also keeps dense outer trails from skipping pixels.
+    float2 pixel = floor(uv * ScreenSize);
+    float3 phase = frac(pixel.xyx * 0.1031);
+    phase += dot(phase, phase.yzx + 33.33);
+    return frac((phase.x + phase.y) * phase.z);
+#else
+    return 0.5;
+#endif
+}
 
 #if MB_USE_FOREGROUND
 #include "Foreground.fxh"
 #endif
 
-float DepthWeight(float4 center, float4 sampleGeometry)
-{
-    if (sampleGeometry.a < 0.5 || (sampleGeometry.a > 2.5 && sampleGeometry.a < 3.5)) {
-        return 0.0;
-    }
-    float gap = abs(center.b - sampleGeometry.b);
-    return 1.0 - smoothstep(DepthTolerance, DepthTolerance * 2.0, gap);
-}
-
-#if MB_QUALITY == 0
-#define MB_TAPS 8
-#elif MB_QUALITY == 2
-#define MB_TAPS 24
-#else
-#define MB_TAPS 16
+#ifndef MB_EDGE_BACKGROUND
+#define MB_EDGE_BACKGROUND 1
 #endif
 
-float3 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
+// Weight of one trail tap. Same-layer taps average the surface. With
+// MB_EDGE_BACKGROUND, taps on empty space or on anything farther count as the
+// background that shows through while the surface moves across this pixel, so
+// the inner side of a silhouette fades like the outer side. Nearer taps are
+// left to ExtendForeground; translucent taps stay excluded.
+float TapWeight(float4 center, float4 sampleGeometry, float sampleAlpha)
 {
-    bool outline = geometry.a > 3.5;
-    if (dot(streak, streak) < MinStreak * MinStreak || (color.a <= 0.004 && !outline)) {
-        return color.rgb;
+    if (IsProtectedSurface(sampleGeometry.a)) {
+        return 0.0;
+    }
+    if (!HasGeometryCoverage(sampleGeometry.a)) {
+        return MB_EDGE_BACKGROUND ? 1.0 : 0.0;
+    }
+    float gap = sampleGeometry.b - center.b;
+    float same = 1.0 - smoothstep(DepthTolerance, DepthTolerance * 2.0, abs(gap));
+    float weight = same * sampleAlpha;
+#if MB_EDGE_BACKGROUND
+    if (!IsOrdinaryTranslucent(center.a) && !IsOrdinaryTranslucent(sampleGeometry.a)) {
+        weight += smoothstep(DepthTolerance, DepthTolerance * 2.0, gap);
+    }
+#endif
+    return weight;
+}
+
+// Tap count follows the streak length, so long streaks keep a fixed spacing
+// instead of breaking into visible copies, and short ones cost less.
+#if MB_QUALITY == 0
+static const float TapSpacing = 4.0;
+static const float MinTaps = 4.0;
+static const float MaxTaps = 32.0;
+#elif MB_QUALITY == 2
+static const float TapSpacing = 1.0;
+static const float MinTaps = 4.0;
+static const float MaxTaps = 128.0;
+#elif MB_QUALITY == 3
+// 0.2.0 kernel: always 16 taps spread over the streak, for side-by-side tests.
+static const float MaxTaps = 16.0;
+#else
+static const float TapSpacing = 2.0;
+static const float MinTaps = 4.0;
+static const float MaxTaps = 64.0;
+#endif
+
+float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
+{
+    bool outline = geometry.a > 3.5 && !IsAdditive(geometry.a);
+    float streakLength = length(streak);
+    if (streakLength < MinStreak() || (color.a <= 0.004 && !outline)) {
+        return color;
     }
 
-    float weightSum = outline ? 0.75 : 2.0;
+#if MB_QUALITY == 3
+    int taps = (int)MaxTaps;
+#else
+    int taps = (int)clamp(ceil(streakLength / TapSpacing), MinTaps, StreakTapBudget(MaxTaps));
+#endif
+    // Keep the centre's share of the total the same as the old 16-tap kernel
+    // (2/16 for surfaces, 0.75/16 for outlines).
+    float weightSum = taps * (outline ? 0.046875 : 0.125);
+    color = DecodeTrailColor(color);
+#if MB_USE_TRAIL_ALPHA
+    float4 sum = color * weightSum;
+#else
     float3 sum = color.rgb * weightSum;
+#endif
     float2 stepUV = streak / ScreenSize;
-    [loop]
-    for (int tap = 0; tap < MB_TAPS; ++tap) {
-        float t = (tap + 0.5) / MB_TAPS - 0.5;
+    float phase = TrailTapPhase(uv);
+    // The tap budget varies with viewport height in the legacy effect compiler.
+    [fastopt]
+    for (int tap = 0; tap < taps; ++tap) {
+        float t = (tap + phase) / taps - 0.5;
         float2 tapUV = uv + t * stepUV;
         float inside = all(tapUV >= 0.0) && all(tapUV < 1.0);
         // Both buffers carry the same log depth and coverage in B/A.
@@ -187,13 +266,34 @@ float3 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 #else
         float4 tapGeometry = tex2Dlod(GeometrySampler, float4(tapUV, 0.0, 0.0));
 #endif
-        float4 tapColor = tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0));
-        float alpha = tapGeometry.a > 3.5 ? 1.0 : tapColor.a;
-        float weight = inside * DepthWeight(geometry, tapGeometry) * alpha;
-        sum += tapColor.rgb * weight;
+#if MB_TRANSLUCENT_MOTION
+        // Keep color and depth on the same texel near translucent layers.
+        float4 tapColor;
+        [branch]
+        if (IsOrdinaryTranslucent(geometry.a) || IsOrdinaryTranslucent(tapGeometry.a)) {
+            tapColor = tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0));
+        } else {
+            tapColor = tex2Dlod(SceneTapSampler, float4(tapUV, 0.0, 0.0));
+        }
+#else
+        float4 tapColor = tex2Dlod(SceneTapSampler, float4(tapUV, 0.0, 0.0));
+#endif
+#if MB_USE_TRAIL_ALPHA
+        // Capture already stores premultiplied color, so average RGBA with the same weights.
+        float weight = inside * TapWeight(geometry, tapGeometry, 1.0);
+        sum += DecodeTrailColor(tapColor) * weight;
+#else
+        float alpha = tapGeometry.a > 3.5 && !IsAdditive(tapGeometry.a) ? 1.0 : tapColor.a;
+        float weight = inside * TapWeight(geometry, tapGeometry, alpha);
+        sum += DecodeTrailColor(tapColor).rgb * weight;
+#endif
         weightSum += weight;
     }
-    return sum / weightSum;
+#if MB_USE_TRAIL_ALPHA
+    return EncodeTrailColor(sum / weightSum);
+#else
+    return EncodeTrailColor(float4(sum / weightSum, color.a));
+#endif
 }
 
 float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
@@ -205,28 +305,31 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     return color;
 #elif MB_USE_FOREGROUND
     float4 geometry = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
-    color.rgb = BlurSurface(uv, color, geometry, geometry.rg);
-    color.rgb = ExtendForeground(uv, color.rgb, geometry);
-    return color;
+    float4 blurred = BlurSurface(uv, color, geometry, geometry.rg);
+    return ExtendForeground(uv, blurred, geometry);
 #else
     float4 geometry = tex2Dlod(GeometrySampler, float4(uv, 0.0, 0.0));
 #if MB_DEBUG == 3
     float depth = saturate((geometry.b + 2.0) / 11.0);
-    return float4(depth.xxx * step(0.5, geometry.a), 1.0);
+    return float4(depth.xxx * HasGeometryCoverage(geometry.a), 1.0);
 #elif MB_DEBUG == 4
+    if (IsOrdinaryTranslucent(geometry.a) || IsAdditive(geometry.a)) {
+        return float4(1.0, 0.0, 0.0, 1.0);
+    }
     if (geometry.a > 3.5) {
         return float4(1.0, 1.0, 0.0, 1.0);
     }
-    return float4(geometry.a > 2.5, geometry.a > 1.5 && geometry.a < 2.5,
-                  geometry.a > 0.5 && geometry.a < 1.5, 1.0);
+    bool modelMotion = HasModelMotion(geometry.a, CurrentCameraAnalysis().x);
+    return float4(geometry.a > 2.5, modelMotion, geometry.a > 0.0 && geometry.a < 2.5 && !modelMotion, 1.0);
 #else
-    float2 streak = ExposureStreak(quadUV, geometry, CameraInterval(), ExposureScale());
+    float4 camera = CurrentCameraAnalysis();
+    float2 streak = ExposureStreak(quadUV, geometry, camera);
 #if MB_DEBUG == 2
     float limit = max(MotionStreakLimit(), 1.0);
     return float4(0.5 + 0.5 * clamp(streak / limit, -1.0, 1.0),
                   saturate(length(streak) / limit), 1.0);
 #else
-    return float4(BlurSurface(uv, color, geometry, streak), color.a);
+    return BlurSurface(uv, color, geometry, streak);
 #endif
 #endif
 #endif
@@ -247,9 +350,16 @@ technique AdvancedMotionBlur <
         "Clear=Color;"
         "Clear=Depth;"
         "ScriptExternal=Color;"
+        "RenderColorTarget0=CameraAnalysis;"
+        "RenderDepthStencilTarget=AnalysisDepth;"
+        "Pass=AnalyzeCamera;"
 #if MB_USE_FOREGROUND
         "RenderColorTarget0=MotionField;"
+        "RenderDepthStencilTarget=SceneDepth;"
         "Pass=BuildMotion;"
+        "RenderColorTarget0=TileRows;"
+        "RenderDepthStencilTarget=TileRowsDepth;"
+        "Pass=ReduceTileRows;"
         "RenderColorTarget0=TileMax;"
         "RenderDepthStencilTarget=TileDepth;"
         "Pass=ReduceTiles;"
@@ -259,16 +369,31 @@ technique AdvancedMotionBlur <
         "RenderColorTarget0=;"
         "RenderDepthStencilTarget=;"
         "Pass=Output;"
-        "RenderColorTarget0=CameraState;"
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+        // Clear for the next auxiliary scene render, after every consumer is done.
+        "RenderColorTarget0=AMB_CutMotion;"
+        "RenderDepthStencilTarget=SceneDepth;"
+        "ClearSetColor=CutMotionClear;"
+        "Clear=Color;"
+#endif
+        "RenderColorTarget0=AMB_CameraHistory;"
         "RenderDepthStencilTarget=CameraDepth;"
         "Pass=SaveCamera;"
         "RenderColorTarget0=;"
         "RenderDepthStencilTarget=;";
 > {
+    pass AnalyzeCamera < string Script = "Draw=Buffer;"; > {
+        MB_SCREEN_STATE
+        PixelShader = compile ps_3_0 AnalyzeCameraFrame();
+    }
 #if MB_USE_FOREGROUND
     pass BuildMotion < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE
         PixelShader = compile ps_3_0 BuildMotionField();
+    }
+    pass ReduceTileRows < string Script = "Draw=Buffer;"; > {
+        MB_SCREEN_STATE
+        PixelShader = compile ps_3_0 BuildTileRows();
     }
     pass ReduceTiles < string Script = "Draw=Buffer;"; > {
         MB_SCREEN_STATE

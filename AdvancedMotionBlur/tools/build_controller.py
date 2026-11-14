@@ -5,14 +5,43 @@ from struct import pack
 
 
 MORPHS = (
-    # MMD panels: 1 eyebrow, 2 eye, 3 mouth.
+    # MMD panels: 1 eyebrow, 2 eye, 3 mouth, 4 other.
     ("Strength +", 1),
     ("Strength -", 1),
     ("Shutter +", 2),
     ("Shutter -", 2),
     ("Streak +", 3),
     ("Streak -", 3),
+    ("Threshold", 4),
+    ("Force Cut", 4),
+    ("Keep Camera", 4),
+    ("Camera Off", 4),
 )
+
+
+COMMENT_LOCAL = "\r\n".join((
+    "AdvancedMotionBlur 控制器　作者：CicloO",
+    "载入后用表情控制动态模糊，可注册关键帧。全部为 0 时与不载入相同。",
+    "Strength +／-：强度最多加倍／降到 0",
+    "Shutter +／-：快门角调到 360°／0°",
+    "Streak +／-：拖影最大长度加倍／降到 0",
+    "Threshold：加大速度死区，只糊快的动作",
+    "Force Cut：≥0.5 时该帧按切镜处理",
+    "Keep Camera：≥0.5 时不做自动切镜判定",
+    "Camera Off：≥0.5 时关闭镜头运动模糊，只保留角色自身动作的模糊",
+))
+
+COMMENT_ENGLISH = "\r\n".join((
+    "AdvancedMotionBlur controller by CicloO.",
+    "Morph weights drive the effect and can be keyed. All zero = no change.",
+    "Strength +/-: up to 2x / down to 0",
+    "Shutter +/-: shutter angle to 360 / 0 degrees",
+    "Streak +/-: maximum streak length up to 2x / down to 0",
+    "Threshold: larger speed dead zone, only fast motion blurs",
+    "Force Cut: >= 0.5 treats the frame as a camera cut",
+    "Keep Camera: >= 0.5 disables automatic cut detection",
+    "Camera Off: >= 0.5 removes camera-motion blur, keeps object motion blur",
+))
 
 
 def pmx_text(value):
@@ -23,10 +52,7 @@ def pmx_text(value):
 def build_controller():
     # PMX 2.0, UTF-16LE, no extra UVs, one-byte indices.
     data = bytearray(b"PMX " + pack("<f9B", 2.0, 8, 0, 0, 1, 1, 1, 1, 1, 1))
-    for value in (
-        "AMB Controller", "AMB Controller",
-        "AdvancedMotionBlur P1", "Morph weights control AdvancedMotionBlur in MME.",
-    ):
+    for value in ("AMB Controller", "AMB Controller", COMMENT_LOCAL, COMMENT_ENGLISH):
         data.extend(pmx_text(value))
 
     # A tiny transparent triangle bound to the root. No shadows or outline.

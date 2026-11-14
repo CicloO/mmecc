@@ -11,6 +11,10 @@ MB_MORPH_WEIGHT(ControlShutterUp, "Shutter +")
 MB_MORPH_WEIGHT(ControlShutterDown, "Shutter -")
 MB_MORPH_WEIGHT(ControlStreakUp, "Streak +")
 MB_MORPH_WEIGHT(ControlStreakDown, "Streak -")
+MB_MORPH_WEIGHT(ControlThreshold, "Threshold")
+MB_MORPH_WEIGHT(ControlForceCut, "Force Cut")
+MB_MORPH_WEIGHT(ControlKeepCamera, "Keep Camera")
+MB_MORPH_WEIGHT(ControlCameraOff, "Camera Off")
 
 #undef MB_MORPH_WEIGHT
 
@@ -27,8 +31,17 @@ float MotionStrength()
 
 float MotionStreakLimit()
 {
-    return max(MB_MAX_STREAK, 0.0) *
+    return StreakPixelScale() * max(MB_MAX_STREAK, 0.0) *
         (1.0 + ControllerWeight(ControlStreakUp) - ControllerWeight(ControlStreakDown));
+}
+
+// Threshold adds up to 16 reference pixels on top of the setting.
+static const float ThresholdMorphRange = 16.0;
+
+float MotionSpeedThreshold()
+{
+    return StreakPixelScale() * (max(MB_SPEED_THRESHOLD, 0.0)
+        + ThresholdMorphRange * ControllerWeight(ControlThreshold));
 }
 
 float MotionShutter()
