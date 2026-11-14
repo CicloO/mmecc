@@ -230,13 +230,32 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
     float reach = 0.5 * streakLength + 0.75;
     int taps = (int)min(StreakTapBudget(64.0), ceil(2.0 * reach));
     float spacing = 2.0 * reach / taps;
+
+    // The tile keeps one dominant direction. Where a fast near object (a hand)
+    // wins the tile, a slower trail at another angle (a fence behind it) is
+    // rejected along that ray and the tile turns sharp. When this pixel's own
+    // motion points elsewhere, also sample along it. In tiles without such a
+    // conflict both directions agree and this second ray is skipped.
+    float ownLength = length(center.rg);
+    float2 ownDirection = ownLength > 0.0 ? center.rg / ownLength : direction;
+    int ownTaps = 0;
+    float ownReach = 0.0;
+    float ownSpacing = 1.0;
+    if (ownLength >= MinStreak() && abs(dot(ownDirection, direction)) < 0.966) {
+        ownReach = 0.5 * min(MotionStreakLimit(), 1.5 * ownLength) + 0.75;
+        ownTaps = (int)min(min(StreakTapBudget(64.0), ceil(2.0 * ownReach)), MaxLoopIterations - taps);
+        ownSpacing = 2.0 * ownReach / max(ownTaps, 1);
+    }
+
     float2 centerPixel = uv * ScreenSize;
     float phase = TrailTapPhase(uv);
     float4 exposure = 0.0;
     [fastopt]
-    for (int tap = 0; tap < taps; ++tap) {
-        float offset = (tap + phase) * spacing - reach;
-        float2 samplePixel = floor(centerPixel + offset * direction) + 0.5;
+    for (int tap = 0; tap < taps + ownTaps; ++tap) {
+        bool own = tap >= taps;
+        float tapSpacing = own ? ownSpacing : spacing;
+        float offset = ((own ? tap - taps : tap) + phase) * tapSpacing - (own ? ownReach : reach);
+        float2 samplePixel = floor(centerPixel + offset * (own ? ownDirection : direction)) + 0.5;
         if (any(samplePixel < 0.0) || any(samplePixel >= ScreenSize)) {
             continue;
         }
@@ -269,11 +288,11 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
         if (support > 0.0) {
             float4 sourceColor = DecodeTrailColor(tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0)));
 #if MB_USE_TRAIL_ALPHA
-            float weight = support * spacing / max(1.0, sourceLength);
+            float weight = support * tapSpacing / max(1.0, sourceLength);
             exposure += sourceColor * weight;
 #else
             float alpha = source.a > 3.5 ? 1.0 : sourceColor.a;
-            float weight = support * alpha * spacing / max(1.0, sourceLength);
+            float weight = support * alpha * tapSpacing / max(1.0, sourceLength);
             exposure += float4(sourceColor.rgb, 1.0) * weight;
 #endif
         }
