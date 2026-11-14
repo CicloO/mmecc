@@ -25,6 +25,8 @@ $cases = @(
     @{ Name = 'q0'; Set = @{ MB_QUALITY = '0' } },
     @{ Name = 'q2'; Set = @{ MB_QUALITY = '2' } },
     @{ Name = 'q3'; Set = @{ MB_QUALITY = '3' } },
+    @{ Name = 'q4'; Set = @{ MB_QUALITY = '4' } },
+    @{ Name = 'q5'; Set = @{ MB_QUALITY = '5' } },
     @{ Name = 'q3streaks'; Set = @{ MB_QUALITY = '3'; MB_SAMPLE_JITTER = '0' } },
     @{ Name = 'p0'; Set = @{ MB_EXTEND_FOREGROUND = '0' } },
     @{ Name = 'p0streaks'; Set = @{ MB_EXTEND_FOREGROUND = '0'; MB_SAMPLE_JITTER = '0' } },

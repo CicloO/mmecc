@@ -31,13 +31,13 @@ DirectX 9.0c（June 2010）运行库
               Shutter + / -    增减快门角，影响拖影长度
   眼（拖影）  Streak + / -     增减拖影长度上限
               Threshold        提高慢动作保持清晰的阈值
-  口（镜头）  Camera + / -     只增减镜头运动造成的模糊，角色自身动作不变
-              Camera Off       关闭镜头模糊
+  口（镜头）  Camera + / -     只增减镜头运动造成的模糊，角色自身动作不变；
+                               Camera - 为 1 时只剩角色自身动作的模糊
   其他        Force Cut        按切镜处理当前帧
               Keep Camera      沿用镜头运动历史
               Jitter Off       颗粒状拖影改为规则的残影状拖影
 
-Camera Off、Force Cut、Keep Camera、Jitter Off 在权重达到 0.5 时生效。
+Force Cut、Keep Camera、Jitter Off 在权重达到 0.5 时生效。
 Force Cut 优先于 Keep Camera。镜头扫得很快、整幅画面糊得太重时，
 可在那一段注册 Camera -。
 
@@ -57,7 +57,7 @@ GeometryData 页即可，Main 页保留原材质。
 MB_EXCLUDED_ACCESSORY_RULES，例如 "MyEffect.x = NoMotionBlur.fx;"。
 多个文件用分号隔开。重载后，已有手动映射的工程仍需检查 GeometryData。
 
-全场景只保留模型动作模糊时，可使用 Camera Off，或将 Settings.fxh 中的
+全场景只保留模型动作模糊时，可把 Camera - 设为 1，或将 Settings.fxh 中的
 MB_CAMERA_MOTION 设为 0。
 
 ■ 常用设置
@@ -70,7 +70,7 @@ MB_CAMERA_MOTION 设为 0。
   MB_SAMPLE_JITTER    1 为采样抖动（默认），0 为固定采样。也可用 Jitter Off 表情按段切换。
   MB_TRANSLUCENT_MOTION  1 时半透明和加法（发光）材质也一起模糊（默认），0 保持清晰。
   MB_LINEAR_LIGHT     1 在线性光空间混合拖影（默认），亮色拖过暗处更自然。
-  MB_QUALITY          0／1／2 为低／中／高（默认 1），3 为固定 16 点采样。
+  MB_QUALITY          0／1／2 为低／中／高（默认 1）；3／4／5 为固定 8／16／24 点采样。
 
 全部参数及附加选项见 docs/PARAMETERS.md。
 

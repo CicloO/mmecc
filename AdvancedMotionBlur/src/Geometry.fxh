@@ -273,14 +273,20 @@ float4 DepthPixel(GeometryOutput input) : COLOR0
 }
 #endif
 
+// CullMode is left to MMD, which sets it per material from the double-sided
+// flag. Forcing NONE drew the hidden back of stage walls in front of the
+// camera, so the whole buffer took that wall's depth and motion.
 #define MB_GEOMETRY_STATE \
     AlphaBlendEnable = FALSE; AlphaTestEnable = FALSE; \
     ZEnable = TRUE; ZWriteEnable = TRUE; ZFunc = LESSEQUAL; \
-    CullMode = NONE; FillMode = SOLID; StencilEnable = FALSE; \
+    FillMode = SOLID; StencilEnable = FALSE; \
     SRGBWriteEnable = FALSE; ColorWriteEnable = 15; \
     MB_CUT_TARGET_STATE \
     VertexShader = compile vs_3_0 ProjectGeometry(); \
     PixelShader = compile ps_3_0 DepthPixel();
+// After a history pass in the same technique the cull state is that pass's
+// NONE, so restore MMD's single-sided default (front faces wind clockwise).
+#define MB_GEOMETRY_STATE_AFTER_HISTORY CullMode = CCW; MB_GEOMETRY_STATE
 
 #if MB_GEOMETRY_HISTORY
 #define MB_HISTORY_WRITE_STATE \
@@ -341,14 +347,19 @@ float4 CopyAtlas(float2 quadUV : TEXCOORD0) : COLOR0
         VertexShader = compile vs_3_0 ScreenQuad(); \
         PixelShader = compile ps_3_0 CopyAtlas(); \
     }
-#define MB_RECORD_PASSES \
-    pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE } \
+#define MB_RECORD_HISTORY_PASS \
     pass RecordHistory < string Script = "Draw=Geometry;"; > { \
         MB_HISTORY_WRITE_STATE \
         FillMode = POINT; PointSize = 1.0; PointScaleEnable = FALSE; \
         VertexShader = compile vs_3_0 RecordVertex(); \
         PixelShader = compile ps_3_0 RecordPixel(); \
     }
+#define MB_RECORD_PASSES \
+    pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE } \
+    MB_RECORD_HISTORY_PASS
+#define MB_RECORD_PASSES_AFTER_COPY \
+    pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE_AFTER_HISTORY } \
+    MB_RECORD_HISTORY_PASS
 
 technique GeometryFirst <
     string MMDPass = "object";
@@ -356,7 +367,7 @@ technique GeometryFirst <
     string Script = MB_COPY_SCRIPT MB_RECORD_SCRIPT;
 > {
     MB_COPY_PASS
-    MB_RECORD_PASSES
+    MB_RECORD_PASSES_AFTER_COPY
 }
 
 technique GeometryFirstSS <
@@ -365,7 +376,7 @@ technique GeometryFirstSS <
     string Script = MB_COPY_SCRIPT MB_RECORD_SCRIPT;
 > {
     MB_COPY_PASS
-    MB_RECORD_PASSES
+    MB_RECORD_PASSES_AFTER_COPY
 }
 
 technique Geometry < string MMDPass = "object"; string Script = MB_RECORD_SCRIPT; > {
@@ -404,13 +415,14 @@ technique GeometrySS < string MMDPass = "object_ss"; string Script = MB_RECORD_S
         PixelShader = compile ps_3_0 RecordRigid(); \
     }
 
+#define MB_DRAW_PASS_AFTER_HISTORY pass WriteGeometry < string Script = "Draw=Geometry;"; > { MB_GEOMETRY_STATE_AFTER_HISTORY }
 technique GeometryFirst < string MMDPass = "object"; string Subset = "0"; string Script = MB_RIGID_SCRIPT; > {
     MB_RIGID_PASSES
-    MB_DRAW_PASS
+    MB_DRAW_PASS_AFTER_HISTORY
 }
 technique GeometryFirstSS < string MMDPass = "object_ss"; string Subset = "0"; string Script = MB_RIGID_SCRIPT; > {
     MB_RIGID_PASSES
-    MB_DRAW_PASS
+    MB_DRAW_PASS_AFTER_HISTORY
 }
 #endif
 

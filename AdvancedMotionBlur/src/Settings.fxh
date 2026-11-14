@@ -1,5 +1,5 @@
 // Reload the effect after editing.
-#define MB_QUALITY 1              // Tap spacing along the streak: 0: 4 px; 1: 2 px; 2: 1 px; 3: fixed 16 taps (0.2.0)
+#define MB_QUALITY 1              // Tap spacing along the streak: 0: 4 px; 1: 2 px; 2: 1 px; fixed taps: 3: 8; 4: 16; 5: 24
 #define MB_SHUTTER_ANGLE 180.0     // Relative to a 30 fps frame, at any export rate
 #define MB_MOTION_SCALE 1.3
 #define MB_SCALE_STREAK_WITH_HEIGHT 1 // 1: streak limits and dead zone use 1080p reference pixels
@@ -14,7 +14,7 @@
 #define MB_CLEAR_RGBA 1.0, 1.0, 1.0, 0.0
 #define MB_TRAIL_ALPHA 0           // 1: capture and output premultiplied RGBA for transparent export
 #define MB_TRANSLUCENT_MOTION 1   // 1: alpha and additive materials blur on their own depth layer; 0: they stay sharp
-#define MB_DEBUG 0                 // 0: result; 1: source; 2: motion; 3: depth; 4: coverage
+#define MB_DEBUG 0                 // 0: result; 1: source; 2: motion; 3: depth; 4: coverage; 5: camera check
 #define MB_EXTEND_FOREGROUND 1     // 0: use the P0 within-surface blur
 #define MB_TRAIL_SPREAD 0.35       // Outer trail width grows by this per px of distance; 0: 0.2.0
 #define MB_LINEAR_COLOR 1          // 0: point-sampled trail colour (0.2.0)

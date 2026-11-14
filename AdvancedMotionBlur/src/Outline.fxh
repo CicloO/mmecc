@@ -44,6 +44,47 @@ bool NearestSurface(float2 uv, float refDepth, int rings, inout float4 resolved,
     return found;
 }
 
+#ifndef MB_LINE_SEARCH
+#define MB_LINE_SEARCH 4
+#endif
+
+// Post-effect lines (Croquis, ComicalEdge, chromatic copies) drawn around a
+// silhouette land on the background, are often wider than a pixel and may
+// border a dark object, so the dark-line test above misses them. Let a pixel
+// within MB_LINE_SEARCH reference pixels of a nearer surface that moves on
+// its own follow that surface. Probes at 2 px and at the full reach, 8 ways.
+void NearerMovingSurface(float2 uv, float4 center, inout float4 resolved, inout float2 offset, inout float coverage)
+{
+    float dt = CurrentCameraAnalysis().x;
+    float2 texel = 1.0 / ScreenSize;
+    float reach = max(1.0, floor(MB_LINE_SEARCH * StreakPixelScale() + 0.5));
+    bool hasCenter = HasGeometryCoverage(center.a);
+    float2 centerMotion = hasCenter ? CameraDisplacement(uv, center.b) : 0.0;
+    bool found = false;
+    [loop]
+    for (int r = 0; r < 2; ++r) {
+        float radius = r == 0 ? min(2.0, reach) : reach;
+        [loop]
+        for (int i = 0; i < 8; ++i) {
+            float2 dir = float2(i < 3 ? -1.0 : (i < 5 ? 0.0 : 1.0),
+                                (i == 0 || i == 5) ? -1.0 : ((i == 2 || i == 7) ? 1.0 : 0.0));
+            if (i == 3) dir = float2(0.0, -1.0);
+            if (i == 4) dir = float2(0.0, 1.0);
+            float2 delta = dir * radius * texel;
+            float4 candidate = tex2Dlod(GeometrySampler, float4(uv + delta, 0.0, 0.0));
+            bool nearer = !hasCenter || center.b - candidate.b > DepthTolerance;
+            bool moving = IsOpaqueSurface(candidate) && HasModelMotion(candidate.a, dt)
+                && length(candidate.rg - centerMotion) > 2.0 * StreakPixelScale();
+            if (!found && nearer && moving) {
+                found = true;
+                resolved = candidate;
+                offset = delta;
+                coverage = 4.0;
+            }
+        }
+    }
+}
+
 float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float coverage)
 {
     offset = 0.0;
@@ -132,5 +173,11 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
             }
         }
     }
+#if MB_LINE_SEARCH > 0
+    [branch]
+    if (coverage < 3.5) {
+        NearerMovingSurface(uv, center, resolved, offset, coverage);
+    }
+#endif
     return resolved;
 }

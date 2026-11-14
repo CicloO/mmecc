@@ -5,25 +5,32 @@ from struct import pack
 
 
 MORPHS = (
-    # MMD panels: 1 eyebrow, 2 eye, 3 mouth, 4 other.
-    # Eyebrow: overall amount.
+    # MMD panels: 1 eyebrow (amount), 2 eye (streak), 3 mouth (camera),
+    # 4 other (cuts and style). Projects store morph keys by index, so keep
+    # released indices and append new morphs. Index 9 was "Camera Off" in
+    # 0.3.0; "Camera -" at weight 1 gives the same result.
     ("Strength +", 1),
     ("Strength -", 1),
     ("Shutter +", 1),
     ("Shutter -", 1),
-    # Eye: streak shape.
     ("Streak +", 2),
     ("Streak -", 2),
     ("Threshold", 2),
-    # Mouth: camera blur.
-    ("Camera +", 3),
-    ("Camera -", 3),
-    ("Camera Off", 3),
-    # Other: cuts and trail style.
     ("Force Cut", 4),
     ("Keep Camera", 4),
+    ("Camera -", 3),
     ("Jitter Off", 4),
+    ("Camera +", 3),
 )
+
+# Order of the sliders within each panel, independent of the indices above.
+DISPLAY_ORDER = (
+    "Strength +", "Strength -", "Shutter +", "Shutter -",
+    "Streak +", "Streak -", "Threshold",
+    "Camera +", "Camera -",
+    "Force Cut", "Keep Camera", "Jitter Off",
+)
+assert sorted(DISPLAY_ORDER) == sorted(name for name, _ in MORPHS)
 
 
 COMMENT_LOCAL = "\r\n".join((
@@ -33,8 +40,7 @@ COMMENT_LOCAL = "\r\n".join((
     "【眉】Shutter +／-：快门角调到 360°／0°",
     "【目】Streak +／-：拖影最大长度加倍／降到 0",
     "【目】Threshold：加大速度死区，只糊快的动作",
-    "【口】Camera +／-：只调镜头运动造成的模糊，最多加倍／降到 0",
-    "【口】Camera Off：≥0.5 时关闭镜头运动模糊，只保留角色自身动作的模糊",
+    "【口】Camera +／-：只调镜头运动造成的模糊，最多加倍／降到 0（Camera - 为 1 时只剩角色自身动作的模糊）",
     "【他】Force Cut：≥0.5 时该帧按切镜处理",
     "【他】Keep Camera：≥0.5 时不做自动切镜判定",
     "【他】Jitter Off：≥0.5 时把颗粒状拖影换成规则的残影状拖影",
@@ -47,8 +53,7 @@ COMMENT_ENGLISH = "\r\n".join((
     "[Eyebrow] Shutter +/-: shutter angle to 360 / 0 degrees",
     "[Eye] Streak +/-: maximum streak length up to 2x / down to 0",
     "[Eye] Threshold: larger speed dead zone, only fast motion blurs",
-    "[Mouth] Camera +/-: camera-motion blur only, up to 2x / down to 0",
-    "[Mouth] Camera Off: >= 0.5 removes camera-motion blur, keeps object motion blur",
+    "[Mouth] Camera +/-: camera-motion blur only, up to 2x / down to 0 (Camera - at 1 keeps only object motion blur)",
     "[Other] Force Cut: >= 0.5 treats the frame as a camera cut",
     "[Other] Keep Camera: >= 0.5 disables automatic cut detection",
     "[Other] Jitter Off: >= 0.5 uses regular ghost streaks instead of grainy trails",
@@ -94,8 +99,9 @@ def build_controller():
     data.extend(pmx_text("表情"))
     data.extend(pmx_text("Facial"))
     data.extend(pack("<Bi", 1, len(MORPHS)))
-    for index in range(len(MORPHS)):
-        data.extend(pack("<Bb", 1, index))
+    names = [name for name, _ in MORPHS]
+    for name in DISPLAY_ORDER:
+        data.extend(pack("<Bb", 1, names.index(name)))
     data.extend(pack("<ii", 0, 0))  # Rigid bodies and joints.
     return data
 

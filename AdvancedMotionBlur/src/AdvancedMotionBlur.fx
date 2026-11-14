@@ -121,7 +121,7 @@ float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
     }
     float2 delta;
     // Controller "Camera +/-" scales the camera's share of the motion;
-    // "Camera Off" removes it, like a cut frame.
+    // "Camera -" at 1 removes it, like a cut frame.
     float cameraScale = CameraMotionScale();
 #if MB_KEEP_OBJECT_MOTION_ON_CUT
     float2 sampleUV = uv + 0.5 / ScreenSize;
@@ -235,8 +235,13 @@ static const float TapSpacing = 1.0;
 static const float MinTaps = 4.0;
 static const float MaxTaps = 128.0;
 #elif MB_QUALITY == 3
-// 0.2.0 kernel: always 16 taps spread over the streak, for side-by-side tests.
-static const float MaxTaps = 16.0;
+// Fixed tap counts like the 0.2.0 presets (4 is its default kernel); long
+// streaks show distinct copies.
+#define MB_FIXED_TAPS 8
+#elif MB_QUALITY == 4
+#define MB_FIXED_TAPS 16
+#elif MB_QUALITY == 5
+#define MB_FIXED_TAPS 24
 #else
 static const float TapSpacing = 2.0;
 static const float MinTaps = 4.0;
@@ -251,20 +256,15 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
         return color;
     }
 
-#if MB_QUALITY == 3
-    int taps = (int)MaxTaps;
+#ifdef MB_FIXED_TAPS
+    int taps = MB_FIXED_TAPS;
 #else
     int taps = (int)clamp(ceil(streakLength / TapSpacing), MinTaps, StreakTapBudget(MaxTaps));
 #endif
-#if MB_QUALITY == 3
-    // Keep the centre's share of the total the same as the old 16-tap kernel
-    // (2/16 for surfaces, 0.75/16 for outlines).
-    float weightSum = taps * (outline ? 0.046875 : 0.125);
-#else
-    // Short streaks keep that share. Long ones cap the centre at one tap, or
-    // a fixed share leaves a faint sharp copy of high-contrast lines.
+    // Up to 8 taps the centre keeps the 0.2.0 share (2/16 for surfaces,
+    // 0.75/16 for outlines). Longer streaks cap it at one tap, or a fixed
+    // share leaves a faint sharp copy of high-contrast lines.
     float weightSum = min(taps * 0.125, 1.0) * (outline ? 0.375 : 1.0);
-#endif
     color = DecodeTrailColor(color);
 #if MB_USE_TRAIL_ALPHA
     float4 sum = color * weightSum;
@@ -320,7 +320,13 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     // MME can draw to a viewport whose origin is inside the MMD window.
     float2 uv = quadUV + 0.5 / ScreenSize;
     float4 color = tex2Dlod(SceneSampler, float4(uv, 0.0, 0.0));
-#if MB_DEBUG == 1
+#if MB_DEBUG == 5
+    // R: projection aspect / screen aspect x 0.5; G: forward angle to the
+    // previous camera in degrees / 4; B: median displacement x 5 (heights).
+    float aspect = (Projection[1][1] / Projection[0][0]) / (ScreenSize.x / ScreenSize.y);
+    float angle = degrees(acos(clamp(dot(PreviousCamera(5.0).xyz, CameraForward()), -1.0, 1.0)));
+    return float4(saturate(0.5 * aspect), saturate(angle / 4.0), saturate(MedianScreenDisplacement() * 5.0), 1.0);
+#elif MB_DEBUG == 1
     return color;
 #elif MB_USE_FOREGROUND
     float4 geometry = tex2Dlod(MotionSampler, float4(uv, 0.0, 0.0));
