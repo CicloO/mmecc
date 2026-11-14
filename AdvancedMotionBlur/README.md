@@ -1,4 +1,4 @@
-# Advanced Motion Blur for MMD 0.2.0 · P1 控制器版
+# Advanced Motion Blur for MMD 0.3.0
 
 作者：CicloO · 协作：Codex、Claude
 
@@ -27,7 +27,15 @@ P1 会把快速前景的拖尾延伸到轮廓外，可覆盖空白底色或较�
 1. 解压整个文件夹，保留 `src/` 内 `.x`、`.fx` 和 `.fxh` 的相对位置。首次验证可放在英文路径。
 2. 确认 MMD 有 **MMEffect** 菜单。将 `src/AdvancedMotionBlur.x` 当作附件载入。第一次对照时只加载一个动态模糊，在附件绘制顺序中把本效果放在场景附件之后。
 3. 连续播放或导出一段角色或镜头有明显运动的片段。附件 **Si** 为强度，1 为默认，0 停用模糊。卸载时从附件面板删除该 `.x`。
-4. 首次验证建议用空工程。旧工程的 `.emm` 可能为角色保留 `DepthVelocity.fx` 映射。可在 **MMEffect → Effect Mapping → GeometryData** 选中整个角色的行，改为 `MotionGeometry.fx`。角色在 Main 页保留原有材质。若只需要镜头运动，可在 `GeometryData` 为该角色使用 `DepthVelocity.fx`。
+4. 首次验证建议用空工程。旧工程的 `.emm` 可能为角色保留 `DepthVelocity.fx` 映射。可在 **MMEffect → Effect Mapping → GeometryData** 选中整个角色的行，改为 `MotionGeometry.fx`。角色在 Main 页保留原有材质。`GeometryData` 里有三种效果可选，按整个对象的行分配：
+
+   | 效果 | 该对象的模糊来源 |
+   |---|---|
+   | `MotionGeometry.fx` | 镜头运动 + 模型自身运动（PMX／PMD 的默认） |
+   | `DepthVelocity.fx` | 仅镜头运动（场景和附件的默认） |
+   | `ObjectMotion.fx` | 仅模型自身运动，镜头怎么动这个对象都不因此模糊 |
+
+   想让整个画面都不受镜头运动影响、只糊模型动作，把 `Settings.fxh` 的 `MB_CAMERA_MOTION` 设为 0 即可，不用逐个改映射。
 
 ## PMX 实时控制器
 
@@ -68,11 +76,13 @@ P1 会把快速前景的拖尾延伸到轮廓外，可覆盖空白底色或较�
 | `MB_EXTEND_FOREGROUND` | 1 | 1 启用前景拖尾扩张，0 使用 P0 的轮廓内采样 |
 | `MB_TRAIL_SPREAD` | 0.35 | 轮廓外拖尾对方向偏差的容忍度，避免描边碎成点；0 回到 0.2.0 |
 | `MB_LINEAR_COLOR` | 1 | 轮廓内模糊颜色线性过滤，斜的细描边均匀变淡；0 回到 0.2.0 |
+| `MB_LINEAR_LIGHT` | 0 | 1 在线性光空间累加拖影颜色，亮色拖过暗处时更亮、更像真实曝光 |
 | `MB_SAMPLE_JITTER` | 1 | 1 沿拖影方向微移采样点，把规则的残影条纹打散成细颗粒；0 为规则的残影状拖影 |
 | `MB_OUTLINE_SEARCH` | 3 | 描边像素向外找模型表面借速度的距离（px），避免宽描边外侧保持清晰、成为虚线 |
 | `MB_OUTLINE_FRINGE` | 1 | 描边的抗锯齿柔边跟着描边模糊，避免运动轮廓上留下深色虚点；0 回到 0.2.0 |
 | `MB_EDGE_BACKGROUND` | 1 | 运动轮廓内侧透出背景，轮廓两侧连续虚化；0 回到 0.2.0 的实心轮廓 |
 | `MB_OUTLINE_MOTION` | 1 | P1 启用原生描边和细后处理描边的速度修正。设为 0 可保留 P1 拖尾并单独对照描边处理 |
+| `MB_CAMERA_MOTION` | 1 | 0 为仅模型运动模糊：镜头运动不产生任何模糊，只有模型（和开启 `MB_ACCESSORY_MOTION` 后的附件）自身的动作有拖影。需要 `MB_KEEP_OBJECT_MOTION_ON_CUT 1` |
 | `MB_AUTO_MODEL_MOTION` | 1 | 为 PMX／PMD 默认启用顶点历史；设为 0 时默认只计算镜头运动，可通过 `GeometryData` 为角色手动开启 |
 | `MB_ACCESSORY_MOTION` | 0 | 1 为移动的 `.x` 附件启用矩阵历史，固定镜头也能试用附件自身拖影 |
 | `MB_HISTORY_SIZE` | 512 | 方形顶点图集边长，容量为边长的平方 |

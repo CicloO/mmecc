@@ -18,11 +18,13 @@
 #define MB_EXTEND_FOREGROUND 1     // 0: use the P0 within-surface blur
 #define MB_TRAIL_SPREAD 0.35       // Outer trail width grows by this per px of distance; 0: 0.2.0
 #define MB_LINEAR_COLOR 1          // 0: point-sampled trail colour (0.2.0)
+#define MB_LINEAR_LIGHT 0          // 1: accumulate trail colour in linear light (brighter trails over dark areas)
 #define MB_SAMPLE_JITTER 1         // 1: taps shifted by a fixed per-pixel phase (grainy); 0: regular ghost streaks
 #define MB_EDGE_BACKGROUND 1     // 0: inner side of moving silhouettes stays opaque (0.2.0)
 #define MB_OUTLINE_SEARCH 3        // Px searched around native outline pixels for surface motion
 #define MB_OUTLINE_FRINGE 1        // Antialiased outline fringe moves with the outline; 0: stays put
 #define MB_OUTLINE_MOTION 1       // 0: disable outline coverage and velocity repair
+#define MB_CAMERA_MOTION 1         // 0: model-only blur; camera movement adds no blur anywhere
 #define MB_AUTO_MODEL_MOTION 1     // PMD/PMX use vertex history by default
 #define MB_ACCESSORY_MOTION 0      // 1: .x accessories use rigid matrix history
 #define MB_HISTORY_SIZE 512        // Vertex history atlas size (square) in MotionGeometry.fx

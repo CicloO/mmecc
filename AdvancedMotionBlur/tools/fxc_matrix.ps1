@@ -47,6 +47,12 @@ $cases = @(
     @{ Name = 'rigid'; Set = @{ MB_ACCESSORY_MOTION = '1' } },
     @{ Name = 'rigidclip'; Set = @{ MB_ACCESSORY_MOTION = '1'; MB_KEEP_OBJECT_MOTION_ON_CUT = '0' } },
     @{ Name = 'all'; Set = $all },
+    @{ Name = 'linearlight'; Set = @{ MB_LINEAR_LIGHT = '1' } },
+    @{ Name = 'linearlightp0'; Set = @{ MB_LINEAR_LIGHT = '1'; MB_EXTEND_FOREGROUND = '0' } },
+    @{ Name = 'linearlightall'; Set = $all + @{ MB_LINEAR_LIGHT = '1' } },
+    @{ Name = 'modelonly'; Set = @{ MB_CAMERA_MOTION = '0' } },
+    @{ Name = 'modelonlyall'; Set = $all + @{ MB_CAMERA_MOTION = '0' } },
+    @{ Name = 'modelonlyclip'; Set = @{ MB_CAMERA_MOTION = '0'; MB_KEEP_OBJECT_MOTION_ON_CUT = '0' } },
     @{ Name = 'allclip'; Set = $all + @{ MB_KEEP_OBJECT_MOTION_ON_CUT = '0'; MB_SAMPLE_JITTER = '0' } },
     @{ Name = 'dbg1'; Set = @{ MB_DEBUG = '1' } },
     @{ Name = 'dbg2'; Set = @{ MB_DEBUG = '2' } },
@@ -56,7 +62,7 @@ $cases = @(
     @{ Name = 'thresh8'; Set = @{ MB_SPEED_THRESHOLD = '8.0' } },
     @{ Name = 'legacy020'; Set = @{ MB_SHUTTER_ANGLE = '180.0'; MB_MOTION_SCALE = '1.0'; MB_MAX_STREAK = '48.0'; MB_SPEED_THRESHOLD = '0.0'; MB_SCALE_STREAK_WITH_HEIGHT = '0'; MB_SAMPLE_JITTER = '0'; MB_KEEP_OBJECT_MOTION_ON_CUT = '0' } }
 )
-$effects = @('AdvancedMotionBlur.fx', 'DepthVelocity.fx', 'MotionGeometry.fx', 'RigidMotion.fx')
+$effects = @('AdvancedMotionBlur.fx', 'DepthVelocity.fx', 'MotionGeometry.fx', 'ObjectMotion.fx', 'RigidMotion.fx')
 $fail = 0
 foreach ($case in $cases) {
     $dir = Join-Path $Work $case.Name

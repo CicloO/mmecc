@@ -1,5 +1,10 @@
 # P0 基线、P1 验证与后续计划
 
+## 0.3.0 合并（2026-11-14）
+
+- 恢复 `MB_LINEAR_LIGHT`（默认关）。新增 `ObjectMotion.fx` 和 `MB_CAMERA_MOTION`：几何阶段改用世界坐标历史经当前镜头投影的位移，主效果在 `MB_CAMERA_MOTION 0` 时不再用深度重建镜头速度。
+- FXC 41 组 × 5 个效果 205 次通过。默认设置下主效果与 `MotionGeometry.fx` 字节码与整理版相同（51,972 B／36,400 B）。`d3dx9_43`：主效果 1.30 s（默认）、1.32 s（线性光）、1.27 s（仅模型）；`ObjectMotion.fx` 0.08 s。
+
 ## 2026-11-12 实机验收与整理
 
 用 MMD 9.32 + MME 0.37 在 `H:\Coding\MotionBlurReview` 的对照副本（Codex `80f166d`）连续导出，1920×1080、60 fps、UtVideo RGB 无损。工程为 `测试基线.pmm` 和 `测试基线_带场景.pmm` 的副本，导出起点在切镜前 6–11 帧，留出预卷。

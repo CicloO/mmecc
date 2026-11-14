@@ -267,7 +267,7 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
             support *= smoothstep(DepthTolerance, 2.0 * DepthTolerance, center.b - source.b);
         }
         if (support > 0.0) {
-            float4 sourceColor = tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0));
+            float4 sourceColor = DecodeTrailColor(tex2Dlod(SceneSampler, float4(tapUV, 0.0, 0.0)));
 #if MB_USE_TRAIL_ALPHA
             float weight = support * spacing / max(1.0, sourceLength);
             exposure += sourceColor * weight;
@@ -278,13 +278,19 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
 #endif
         }
     }
+#if MB_USE_LINEAR_LIGHT
+    if (!any(exposure != 0.0)) {
+        return background;
+    }
+    background = DecodeTrailColor(background);
+#endif
 #if MB_USE_TRAIL_ALPHA
     // Clamp coverage for overlapping taps and keep their average color.
     exposure /= max(1.0, exposure.a);
-    return exposure + background * (1.0 - exposure.a);
+    return EncodeTrailColor(exposure + background * (1.0 - exposure.a));
 #else
     float3 foreground = exposure.rgb / max(exposure.a, 0.0001);
-    return float4(lerp(background.rgb, foreground, saturate(exposure.a)), background.a);
+    return EncodeTrailColor(float4(lerp(background.rgb, foreground, saturate(exposure.a)), background.a));
 #endif
 }
 

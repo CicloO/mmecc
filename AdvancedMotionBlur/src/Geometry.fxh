@@ -6,6 +6,17 @@
 #define MB_RIGID_HISTORY 0
 #endif
 #define MB_GEOMETRY_HISTORY (MB_VERTEX_HISTORY || MB_RIGID_HISTORY)
+// Object-only motion: project the previous world position with the current
+// camera, so camera movement adds nothing. Needs the world-space history of
+// MB_KEEP_OBJECT_MOTION_ON_CUT; without it the full (camera + object) motion stays.
+#ifndef MB_OBJECT_ONLY
+#define MB_OBJECT_ONLY (!MB_CAMERA_MOTION)
+#endif
+#if MB_OBJECT_ONLY && MB_KEEP_OBJECT_MOTION_ON_CUT
+#define MB_PREVIOUS_CLIP previousLocalClip
+#else
+#define MB_PREVIOUS_CLIP previousClip
+#endif
 
 #if MB_KEEP_OBJECT_MOTION_ON_CUT || MB_RIGID_HISTORY
 #include "HistoryTargets.fxh"
@@ -222,13 +233,13 @@ float4 SurfaceDepth(GeometryOutput input)
     float coverage = (alpha >= 0.985 && !opadd) ? 1.0 : 3.0;
 #endif
 #if MB_GEOMETRY_HISTORY
-    if (abs(coverage) == 1.0 && input.previousClip.w > 0.999 && input.currentClip.z > 0.0001) {
+    if (abs(coverage) == 1.0 && input.MB_PREVIOUS_CLIP.w > 0.999 && input.currentClip.z > 0.0001) {
 #if MB_VERTEX_HISTORY && !MB_KEEP_OBJECT_MOTION_ON_CUT
         float motionCoverage = EncodeModelInterval(input.historyInterval);
 #else
         float motionCoverage = 2.0;
 #endif
-        return float4(GeometryMotion(input.currentClip, input.previousClip.xyz), depth, coverage * motionCoverage);
+        return float4(GeometryMotion(input.currentClip, input.MB_PREVIOUS_CLIP.xyz), depth, coverage * motionCoverage);
     }
 #endif
     return float4(0.0, 0.0, depth, coverage);
