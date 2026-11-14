@@ -34,8 +34,7 @@
 - 新增 PMX 实时控制器 `AdvancedMotionBlurController.pmx`：眉 `Strength ±`、眼 `Shutter ±`、口 `Streak ±`，可注册表情关键帧。
 - 快门角固定按 30 fps 的一帧计算，30 和 60 fps 导出的拖影长度相同；删除 `MB_OUTPUT_FPS`。
 - 修正载入后画面偏移（全屏四边形局部 UV 与半像素补偿）。
-- 目录改为 `src/`、`docs/`、`fixtures/`、`tools/`；新增参数手册 `docs/PARAMETERS.md`。
-- 尚未在 MMD 实机验收控制器，见 `docs/VALIDATION.md`。
+- 新增参数手册 `docs/PARAMETERS.md`。
 
 ## 0.1.0 · P0
 
