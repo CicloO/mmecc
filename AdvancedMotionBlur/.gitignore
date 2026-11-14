@@ -9,6 +9,7 @@ test/*.avi
 dist/
 
 # Local collaboration and validation records
+/README.md
 /CLAUDE.md
 /docs/HANDOFF.md
 /docs/ROADMAP.md
