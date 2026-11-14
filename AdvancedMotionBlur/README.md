@@ -4,7 +4,7 @@ AdvancedMotionBlur 是 CicloO 制作的 MikuMikuEffect 动态模糊效果，适�
 
 ## 下载与载入
 
-配布包发布后可从 [GitHub Releases](https://github.com/CicloO/mmecc/releases) 下载。完整解压后，将 `AdvancedMotionBlur.x` 作为附件载入 MMD，在附件绘制顺序中放在舞台等场景附件之后。附件的 **Si** 默认为 1，设为 0 可关掉模糊。请连续播放或导出查看效果。
+下载 [AdvancedMotionBlur 0.3.0 配布 ZIP](https://github.com/CicloO/mmecc/releases/download/AdvancedMotionBlur/v0.3.0-dist/MMD-AdvancedMotionBlur-0.3.0.zip)。完整解压后，将 `AdvancedMotionBlur.x` 作为附件载入 MMD，在附件绘制顺序中放在舞台等场景附件之后。附件的 **Si** 默认为 1，设为 0 可关掉模糊。请连续播放或导出查看效果。
 
 从仓库源码试用时，运行文件位于 `src/`。使用条件、安装和旧控制器升级说明见 [Readme.txt](src/Readme.txt)。
 
