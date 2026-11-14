@@ -253,6 +253,7 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
 
     float2 centerPixel = uv * ScreenSize;
     float phase = TrailTapPhase(uv);
+    float softness = StreakSoftness();
     float4 exposure = 0.0;
     [fastopt]
     for (int tap = 0; tap < taps + ownTaps; ++tap) {
@@ -281,6 +282,7 @@ float4 ExtendForeground(float2 uv, float4 background, float4 center)
         float across = abs(dot(delta, float2(-axis.y, axis.x)));
         float halfLength = 0.5 * sourceLength;
         float support = 1.0 - smoothstep(max(0.0, halfLength - 0.75), halfLength + 0.75, along);
+        support *= StreakProfile(0.5 * min(along / halfLength, 1.0), softness);
         // The ray follows the tile's dominant direction, which differs a little
         // from each source's own. A fixed ~1 px width only lets aligned pixels
         // through and breaks thin outlines into dots, so widen it with distance.

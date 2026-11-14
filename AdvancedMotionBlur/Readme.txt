@@ -27,15 +27,16 @@ DirectX 9.0c（June 2010）运行库
 请保留原文件名。表情权重为 0–1，全部为 0 时沿用附件 Si 和 Settings.fxh。
 可按帧注册表情。
 
-  眉（整体）  Strength + / -   增减强度
-              Shutter + / -    增减快门角，影响拖影长度
-  眼（拖影）  Streak + / -     增减拖影长度上限
-              Threshold        提高慢动作保持清晰的阈值
-  口（镜头）  Camera + / -     只增减镜头运动造成的模糊，角色自身动作不变；
-                               Camera - 为 1 时只剩角色自身动作的模糊
-  其他        Force Cut        按切镜处理当前帧
-              Keep Camera      沿用镜头运动历史
-              Jitter Off       颗粒状拖影改为规则的残影状拖影
+  眉（模糊量）  Strength + / -   增减强度
+                Shutter + / -    增减快门角，影响拖影长度
+  眼（长度）    Streak + / -     增减拖影长度上限
+                Threshold        提高慢动作保持清晰的阈值
+  口（镜头）    Camera + / -     只增减镜头运动造成的模糊，角色自身动作不变；
+                                 Camera - 为 1 时只剩角色自身动作的模糊
+                Force Cut        按切镜处理当前帧
+                Keep Camera      沿用镜头运动历史
+  其他（样式）  Gaussian         拖影改为两端柔和淡出的高斯分布
+                Jitter Off       颗粒状拖影改为规则的残影状拖影
 
 Force Cut、Keep Camera、Jitter Off 在权重达到 0.5 时生效。
 Force Cut 优先于 Keep Camera。镜头扫得很快、整幅画面糊得太重时，
@@ -67,6 +68,7 @@ MB_CAMERA_MOTION 设为 0。
   MB_SHUTTER_ANGLE    快门角，默认 180°，以 30 fps 的一帧为基准。
   MB_MAX_STREAK       拖影长度上限，默认 64 px，以 1080p 为基准。
   MB_SPEED_THRESHOLD  速度死区，默认 3 px，以 1080p 为基准。
+  MB_STREAK_SOFTNESS  0 为均匀拖影（默认），1 为两端柔和淡出的高斯分布。也可用 Gaussian 表情调节。
   MB_SAMPLE_JITTER    1 为采样抖动（默认），0 为固定采样。也可用 Jitter Off 表情按段切换。
   MB_TRANSLUCENT_MOTION  1 时半透明和加法（发光）材质也一起模糊（默认），0 保持清晰。
   MB_LINEAR_LIGHT     1 在线性光空间混合拖影（默认），亮色拖过暗处更自然。

@@ -438,17 +438,61 @@ technique GeometrySS < string MMDPass = "object_ss"; > { pass WriteGeometry { MB
 #if (MB_EXTEND_FOREGROUND && MB_OUTLINE_MOTION) || MB_EXCLUDE_FROM_BLUR
 float4 OutlineColor : EDGECOLOR;
 
+// MMD widens its outline with proximity: tens of pixels in a close-up, far
+// beyond the few pixels ResolveOutline searches for a surface to borrow from.
+// The hull shares vertex indices with the surface, so read both unexpanded
+// positions from the atlases the object pass has just written.
+#if MB_VERTEX_HISTORY && MB_KEEP_OBJECT_MOTION_ON_CUT && !MB_EXCLUDE_FROM_BLUR
+#define MB_OUTLINE_HISTORY 1
+#else
+#define MB_OUTLINE_HISTORY 0
+#endif
+
 struct OutlineOutput {
     float4 position : POSITION;
     float viewDepth : TEXCOORD0;
+#if MB_OUTLINE_HISTORY
+    float4 currentClip : TEXCOORD1;
+    float4 previousClip : TEXCOORD2;
+    float4 previousLocalClip : TEXCOORD3;
+#endif
 };
 
-OutlineOutput ProjectOutline(float4 position : POSITION)
+OutlineOutput ProjectOutline(float4 position : POSITION
+#if MB_OUTLINE_HISTORY
+                             , int index : _INDEX
+#endif
+                             )
 {
     // MMD's edge pass already supplies the expanded hull vertices.
     OutlineOutput output;
     output.position = mul(position, ObjectToClip);
     output.viewDepth = mul(position, ObjectToView).z;
+#if MB_OUTLINE_HISTORY
+    output.currentClip = 0.0;
+    output.previousClip = 0.0;
+    output.previousLocalClip = 0.0;
+    float2 atlasUV = (AtlasCell(index) + 0.5) / AtlasSize;
+    float4 now = tex2Dlod(CurrentSampler, float4(atlasUV, 0.0, 0.0));
+    float4 then = tex2Dlod(PreviousSampler, float4(atlasUV, 0.0, 0.0));
+    float previousTime = -then.w - 1.0;
+    float dt = Timeline - previousTime;
+    float4 cameraTiming = HistoryCameraSlot(4.0);
+    // `now` must be this frame's record of the same vertex: written by the
+    // object pass (same timestamp) and within the hull's expansion of it.
+    float3 lift = mul(position, ObjectToWorld).xyz - now.xyz;
+    float reach = 1.0 + 0.05 * max(output.viewDepth, 0.0);
+    bool valid = FitsAtlas(index) && now.w == -(Timeline + 1.0) && then.w <= -1.0
+        && dt > MB_MIN_FRAME_GAP && dt <= MB_MAX_FRAME_GAP
+        && cameraTiming.w == CameraHistoryTag && abs(cameraTiming.x - previousTime) <= MB_MIN_FRAME_GAP
+        && dot(lift, lift) < reach * reach && !HistoryTeleported(now.xyz - then.xyz);
+    if (valid) {
+        float4 world = float4(then.xyz, 1.0);
+        output.currentClip = ReprojectHistory(float4(now.xyz, 1.0), WorldToClip);
+        output.previousClip = ReprojectHistory(world, HistoryViewProjection());
+        output.previousLocalClip = ReprojectHistory(world, WorldToClip);
+    }
+#endif
     return output;
 }
 
@@ -463,7 +507,13 @@ float4 OutlineSurfaceDepth(OutlineOutput input)
 #else
     float coverage = OutlineColor.a >= 0.985 ? 4.0 : 3.0;
 #endif
-    return float4(0.0, 0.0, log2(max(input.viewDepth, 0.0001)), coverage);
+    float depth = log2(max(input.viewDepth, 0.0001));
+#if MB_OUTLINE_HISTORY
+    if (coverage == 4.0 && input.currentClip.w > 0.999 && input.MB_PREVIOUS_CLIP.w > 0.999) {
+        return float4(GeometryMotion(input.currentClip.xyz, input.MB_PREVIOUS_CLIP.xyz), depth, OutlineMotionCoverage);
+    }
+#endif
+    return float4(0.0, 0.0, depth, coverage);
 }
 
 #if MB_KEEP_OBJECT_MOTION_ON_CUT
@@ -472,6 +522,12 @@ DepthTargets OutlineDepth(OutlineOutput input)
     DepthTargets output;
     output.primary = OutlineSurfaceDepth(input);
     output.cutMotion = 0.0;
+#if MB_OUTLINE_HISTORY
+    if (output.primary.a == OutlineMotionCoverage && input.previousLocalClip.w > 0.999) {
+        float2 motion = GeometryMotion(input.currentClip.xyz, input.previousLocalClip.xyz);
+        output.cutMotion = float4(motion, output.primary.b, 1.0);
+    }
+#endif
     return output;
 }
 #else

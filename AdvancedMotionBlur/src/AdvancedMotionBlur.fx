@@ -273,12 +273,13 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 #endif
     float2 stepUV = streak / ScreenSize;
     float phase = TrailTapPhase(uv);
+    float softness = StreakSoftness();
     // The tap budget varies with viewport height in the legacy effect compiler.
     [fastopt]
     for (int tap = 0; tap < taps; ++tap) {
         float t = (tap + phase) / taps - 0.5;
         float2 tapUV = uv + t * stepUV;
-        float inside = all(tapUV >= 0.0) && all(tapUV < 1.0);
+        float inside = (all(tapUV >= 0.0) && all(tapUV < 1.0)) * StreakProfile(t, softness);
         // Both buffers carry the same log depth and coverage in B/A.
 #if MB_USE_FOREGROUND
         float4 tapGeometry = tex2Dlod(MotionSampler, float4(tapUV, 0.0, 0.0));
@@ -342,7 +343,9 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
         return float4(1.0, 0.0, 0.0, 1.0);
     }
     if (geometry.a > 3.5) {
-        return float4(1.0, 1.0, 0.0, 1.0);
+        // White: outline with its own vertex-history motion. Yellow: outline
+        // that has to borrow motion from a nearby surface.
+        return float4(1.0, 1.0, geometry.a == OutlineMotionCoverage, 1.0);
     }
     bool modelMotion = HasModelMotion(geometry.a, CurrentCameraAnalysis().x);
     return float4(geometry.a > 2.5, modelMotion, geometry.a > 0.0 && geometry.a < 2.5 && !modelMotion, 1.0);

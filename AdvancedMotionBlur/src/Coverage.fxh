@@ -1,3 +1,6 @@
+// A native outline pixel is 4.0. 4.5 is one that carries its own motion in RG,
+// taken from the vertex history, so it needs no nearby surface to borrow from.
+static const float OutlineMotionCoverage = 4.5;
 static const float AdditiveCoverage = 6.0;
 static const float ExcludedCoverage = 7.0;
 static const float TranslucentSurface = -3.0;

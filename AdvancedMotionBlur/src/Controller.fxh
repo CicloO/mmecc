@@ -17,6 +17,7 @@ MB_MORPH_WEIGHT(ControlKeepCamera, "Keep Camera")
 MB_MORPH_WEIGHT(ControlCameraDown, "Camera -")
 MB_MORPH_WEIGHT(ControlJitterOff, "Jitter Off")
 MB_MORPH_WEIGHT(ControlCameraUp, "Camera +")
+MB_MORPH_WEIGHT(ControlGaussian, "Gaussian")
 
 #undef MB_MORPH_WEIGHT
 
@@ -50,6 +51,25 @@ float MotionSpeedThreshold()
 {
     return StreakPixelScale() * (max(MB_SPEED_THRESHOLD, 0.0)
         + ThresholdMorphRange * ControllerWeight(ControlThreshold));
+}
+
+// 0: every moment of the exposure counts the same (box shutter, hard streak
+// ends). 1: Gaussian weighting along the streak like MotionBlur3L, soft ends.
+#ifndef MB_STREAK_SOFTNESS
+#define MB_STREAK_SOFTNESS 0.0
+#endif
+
+float StreakSoftness()
+{
+    return saturate(MB_STREAK_SOFTNESS + ControllerWeight(ControlGaussian));
+}
+
+// Weight of a sample at `position` along the streak: 0 at its centre, 0.5 at
+// either end. The Gaussian falls to exp(-2) at the ends and is scaled so the
+// whole streak still adds up to one exposure.
+float StreakProfile(float position, float softness)
+{
+    return lerp(1.0, exp(-8.0 * position * position) / 0.598, softness);
 }
 
 float MotionShutter()

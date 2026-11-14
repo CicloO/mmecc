@@ -94,6 +94,11 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
         return resolved;
     }
     float2 texel = 1.0 / ScreenSize;
+    if (center.a == OutlineMotionCoverage) {
+        // The edge pass measured this pixel's own motion; use it as a moving surface.
+        coverage = 4.0;
+        return float4(center.rg, center.b, 2.0);
+    }
     if (center.a > 3.5) {
         // An expanded vertex and its unexpanded history cannot be subtracted.
         // Use nearby surface velocity, with native outline depth as a camera fallback.
@@ -121,6 +126,9 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
     // the ring search per neighbour made MME's compiler several times slower.
     float outlineDepth = 0.0;
     bool touchesOutline = false;
+    bool outlineHasMotion = false;
+    float4 outlineSurface = 0.0;
+    float2 outlineOffset = 0.0;
     [unroll]
     for (int n = 0; n < 4; ++n) {
         float2 step = (n < 2 ? float2(1.0, 0.0) : float2(0.0, 1.0)) * ((n % 2 == 0) ? 1.0 : -1.0);
@@ -131,10 +139,19 @@ float4 ResolveOutline(float2 uv, float4 center, out float2 offset, out float cov
             (translucent ? (behind || sameLayer) : behind)) {
             touchesOutline = true;
             outlineDepth = neighbor.b;
+            outlineHasMotion = neighbor.a == OutlineMotionCoverage;
+            outlineSurface = float4(neighbor.rg, neighbor.b, 2.0);
+            outlineOffset = step * texel;
         }
     }
+    if (touchesOutline && outlineHasMotion) {
+        // The fringe moves with the outline pixel it belongs to.
+        resolved = outlineSurface;
+        offset = outlineOffset;
+        coverage = 4.0;
+    }
     [branch]
-    if (touchesOutline) {
+    if (touchesOutline && !outlineHasMotion) {
         float4 surface = resolved;
         float2 surfaceOffset = 0.0;
         if (NearestSurface(uv, outlineDepth, MB_OUTLINE_SEARCH + 1, surface, surfaceOffset)) {
