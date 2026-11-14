@@ -27,16 +27,19 @@ DirectX 9.0c（June 2010）运行库
 请保留原文件名。表情权重为 0–1，全部为 0 时沿用附件 Si 和 Settings.fxh。
 可按帧注册表情。
 
-  眉    Strength + / -   增减强度
-  眼    Shutter + / -    增减快门角，影响拖影长度
-  口    Streak + / -     增减拖影长度上限
-  其他  Threshold        提高慢动作保持清晰的阈值
-        Force Cut        按切镜处理当前帧
-        Keep Camera      沿用镜头运动历史
-        Camera Off       关闭镜头模糊
-        Jitter Off       颗粒状拖影改为规则的残影状拖影
+  眉（整体）  Strength + / -   增减强度
+              Shutter + / -    增减快门角，影响拖影长度
+  眼（拖影）  Streak + / -     增减拖影长度上限
+              Threshold        提高慢动作保持清晰的阈值
+  口（镜头）  Camera + / -     只增减镜头运动造成的模糊，角色自身动作不变
+              Camera Off       关闭镜头模糊
+  其他        Force Cut        按切镜处理当前帧
+              Keep Camera      沿用镜头运动历史
+              Jitter Off       颗粒状拖影改为规则的残影状拖影
 
-最后四项在权重达到 0.5 时生效。Force Cut 优先于 Keep Camera。
+Camera Off、Force Cut、Keep Camera、Jitter Off 在权重达到 0.5 时生效。
+Force Cut 优先于 Keep Camera。镜头扫得很快、整幅画面糊得太重时，
+可在那一段注册 Camera -。
 
 ■ 按对象设置模糊
 

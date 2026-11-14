@@ -20,13 +20,14 @@
 | 表情栏 | 表情 | 权重为 1 时 |
 | --- | --- | --- |
 | 眉 | `Strength +`、`Strength -` | 分别把 `MB_MOTION_SCALE` 倍率增至两倍或降至零，仍与附件 Si 相乘。基准 1.3 对应 0–2.6 |
-| 眼 | `Shutter +`、`Shutter -` | 从 `MB_SHUTTER_ANGLE` 的基准分别调到 360° 或 0°。基准 180°，`+`=1 时曝光翻倍 |
-| 口 | `Streak +`、`Streak -` | 分别把 `MB_MAX_STREAK` 增至两倍或降至零。1080p 下基准 64 px 对应 0–128 px |
-| 其他 | `Threshold` | 在 `MB_SPEED_THRESHOLD` 上再加死区，1080p 下最多加 16 px。要更小的死区可直接改设置值 |
+| 眉 | `Shutter +`、`Shutter -` | 从 `MB_SHUTTER_ANGLE` 的基准分别调到 360° 或 0°。基准 180°，`+`=1 时曝光翻倍 |
+| 眼 | `Streak +`、`Streak -` | 分别把 `MB_MAX_STREAK` 增至两倍或降至零。1080p 下基准 64 px 对应 0–128 px |
+| 眼 | `Threshold` | 在 `MB_SPEED_THRESHOLD` 上再加死区，1080p 下最多加 16 px。要更小的死区可直接改设置值 |
+| 口 | `Camera +`、`Camera -` | 只把镜头运动造成的那部分位移增至两倍或降至零，角色自身动作的拖影不变。快速扫镜整幅画面糊得太重时，在那一段注册 `Camera -`。依赖 `MB_KEEP_OBJECT_MOTION_ON_CUT 1`；该项为 0 时只缩放场景的镜头拖影 |
 | 其他 | `Force Cut` | 权重达到 0.5 时，强制按切镜处理 |
 | 其他 | `Keep Camera` | 权重达到 0.5 时，跳过自动切镜判定。与 `Force Cut` 同时生效时，以 `Force Cut` 为准 |
 | 其他 | `Jitter Off` | 权重达到 0.5 时，把颗粒状拖影换成规则的残影状拖影（等同 `MB_SAMPLE_JITTER 0`），可只在某几段注册。`MB_SAMPLE_JITTER 0` 时不起作用 |
-| 其他 | `Camera Off` | 权重达到 0.5 时，整个画面不再因镜头运动模糊，只有模型自身的动作有拖影，效果与 `MB_CAMERA_MOTION 0` 相同，但可以只在某几段注册。依赖 `MB_KEEP_OBJECT_MOTION_ON_CUT 1`；该项为 0 时只去掉场景的镜头拖影，模型仍带镜头运动 |
+| 口 | `Camera Off` | 权重达到 0.5 时，整个画面不再因镜头运动模糊，只有模型自身的动作有拖影，效果与 `MB_CAMERA_MOTION 0` 相同，但可以只在某几段注册。依赖 `MB_KEEP_OBJECT_MOTION_ON_CUT 1`；该项为 0 时只去掉场景的镜头拖影，模型仍带镜头运动 |
 
 切镜表情可注册关键帧。只影响一帧时，在相邻帧注册 0。重复帧、倒放、历史缺失和过大的时间差仍由时间保护处理。旧 PMM 如果提示控制器模型结构变化，先用工程副本核对原有表情关键帧。新版追加两项，原有表情索引和分类保持一致。
 

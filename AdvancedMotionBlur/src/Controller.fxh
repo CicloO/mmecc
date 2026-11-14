@@ -16,6 +16,8 @@ MB_MORPH_WEIGHT(ControlForceCut, "Force Cut")
 MB_MORPH_WEIGHT(ControlKeepCamera, "Keep Camera")
 MB_MORPH_WEIGHT(ControlCameraOff, "Camera Off")
 MB_MORPH_WEIGHT(ControlJitterOff, "Jitter Off")
+MB_MORPH_WEIGHT(ControlCameraUp, "Camera +")
+MB_MORPH_WEIGHT(ControlCameraDown, "Camera -")
 
 #undef MB_MORPH_WEIGHT
 
@@ -28,6 +30,15 @@ float MotionStrength()
 {
     return max(MB_MOTION_SCALE, 0.0) *
         (1.0 + ControllerWeight(ControlStrengthUp) - ControllerWeight(ControlStrengthDown));
+}
+
+// Camera share of the motion: 0..2. "Camera Off" at 0.5 or more removes it.
+float CameraMotionScale()
+{
+    if (ControllerWeight(ControlCameraOff) >= 0.5) {
+        return 0.0;
+    }
+    return max(0.0, 1.0 + ControllerWeight(ControlCameraUp) - ControllerWeight(ControlCameraDown));
 }
 
 float MotionStreakLimit()

@@ -120,13 +120,15 @@ float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
         return 0.0;
     }
     float2 delta;
-    // Controller "Camera Off": blur only from objects' own motion, like a cut frame.
-    bool cameraOff = ControllerWeight(ControlCameraOff) >= 0.5;
+    // Controller "Camera +/-" scales the camera's share of the motion;
+    // "Camera Off" removes it, like a cut frame.
+    float cameraScale = CameraMotionScale();
 #if MB_KEEP_OBJECT_MOTION_ON_CUT
-    if (camera.w > 0.5 || cameraOff) {
-        float2 sampleUV = uv + 0.5 / ScreenSize;
-        float4 localMotion = tex2Dlod(CutMotionSampler, float4(sampleUV, 0.0, 0.0));
-        delta = localMotion.a > 0.5 && abs(localMotion.b - geometry.b) < 0.002 ? localMotion.rg : 0.0;
+    float2 sampleUV = uv + 0.5 / ScreenSize;
+    float4 localMotion = tex2Dlod(CutMotionSampler, float4(sampleUV, 0.0, 0.0));
+    float2 objectDelta = localMotion.a > 0.5 && abs(localMotion.b - geometry.b) < 0.002 ? localMotion.rg : 0.0;
+    if (camera.w > 0.5 || cameraScale <= 0.0) {
+        delta = objectDelta;
     } else
 #endif
     {
@@ -136,8 +138,14 @@ float2 ExposureStreak(float2 uv, float4 geometry, float4 camera)
         float motionCoverage = geometry.a;
 #endif
 #if MB_CAMERA_MOTION
-        delta = HasModelMotion(motionCoverage, dt) ? geometry.rg
-            : (cameraOff ? 0.0 : CameraDisplacement(uv, geometry.b));
+        bool modelMotion = HasModelMotion(motionCoverage, dt);
+        float2 fullDelta = modelMotion ? geometry.rg : CameraDisplacement(uv, geometry.b);
+#if MB_KEEP_OBJECT_MOTION_ON_CUT
+        // Object-only motion is the full motion minus what the camera adds.
+        delta = objectDelta + cameraScale * (fullDelta - objectDelta);
+#else
+        delta = modelMotion ? fullDelta : cameraScale * fullDelta;
+#endif
 #else
         delta = HasModelMotion(motionCoverage, dt) ? geometry.rg : 0.0;
 #endif
@@ -248,9 +256,15 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 #else
     int taps = (int)clamp(ceil(streakLength / TapSpacing), MinTaps, StreakTapBudget(MaxTaps));
 #endif
+#if MB_QUALITY == 3
     // Keep the centre's share of the total the same as the old 16-tap kernel
     // (2/16 for surfaces, 0.75/16 for outlines).
     float weightSum = taps * (outline ? 0.046875 : 0.125);
+#else
+    // Short streaks keep that share. Long ones cap the centre at one tap, or
+    // a fixed share leaves a faint sharp copy of high-contrast lines.
+    float weightSum = min(taps * 0.125, 1.0) * (outline ? 0.375 : 1.0);
+#endif
     color = DecodeTrailColor(color);
 #if MB_USE_TRAIL_ALPHA
     float4 sum = color * weightSum;

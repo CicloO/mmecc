@@ -7,6 +7,10 @@
 - 半透明和加法（发光）材质默认参与模糊（`MB_TRANSLUCENT_MOTION 1`）：链子、饰品、发光片不再在周围都糊了时保持清晰。设为 0 恢复原样。
 - 线性光混合默认开启（`MB_LINEAR_LIGHT 1`）。
 - 控制器其他栏新增 `Jitter Off`：权重 ≥0.5 时把颗粒状拖影换成规则的残影状拖影，可按段落注册。
+- 控制器新增 `Camera +`、`Camera -`：只增减镜头运动造成的模糊，角色自身动作的拖影不变。
+- 控制器表情按用途重新分栏：眉＝整体（Strength、Shutter），眼＝拖影（Streak、Threshold），口＝镜头（Camera ±、Camera Off），其他＝切镜和样式（Force Cut、Keep Camera、Jitter Off）。旧工程载入时 MMD 会提示适配控制器。
+- 长拖影不再留下清晰的中心残像：表面模糊的中心权重最多相当于一个采样，Croquis、ComicalEdge 等后期描线和模型描边会一起糊开。
+- 半透明描边（材质描边 α<1）在 `MB_TRANSLUCENT_MOTION 1` 时也随表面移动。
 
 ## 0.3.0（2026-11-14）
 

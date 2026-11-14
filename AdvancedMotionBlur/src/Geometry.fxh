@@ -445,6 +445,9 @@ float4 OutlineSurfaceDepth(OutlineOutput input)
     clip(OutlineColor.a - 0.004);
 #if MB_EXCLUDE_FROM_BLUR
     float coverage = ExcludedCoverage;
+#elif MB_TRANSLUCENT_MOTION
+    // Semi-transparent outlines (edge alpha below 1) move with their surface too.
+    float coverage = 4.0;
 #else
     float coverage = OutlineColor.a >= 0.985 ? 4.0 : 3.0;
 #endif
