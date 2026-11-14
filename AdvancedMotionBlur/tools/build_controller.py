@@ -7,42 +7,36 @@ from struct import pack
 MORPHS = (
     # MMD panels by function: 1 eyebrow = exposure amount, 2 eye = streak
     # length range, 3 mouth = camera (its blur and its cuts), 4 other = streak
-    # style. The panel is a field of each morph, so regrouping never moves an
-    # index. Projects store morph keys by index: keep released indices and
-    # append new morphs. Index 9 was "Camera Off" in 0.3.0; "Camera -" at
-    # weight 1 gives the same result.
+    # style. 0.4.0 orders the morphs by panel (set by the author in
+    # PMXEditor); projects keyed with the 0.3.0 controller need their morph
+    # keys re-registered.
     ("Strength +", 1),
     ("Strength -", 1),
     ("Shutter +", 1),
     ("Shutter -", 1),
+    ("Threshold", 2),
     ("Streak +", 2),
     ("Streak -", 2),
-    ("Threshold", 2),
+    ("Camera +", 3),
+    ("Camera -", 3),
     ("Force Cut", 3),
     ("Keep Camera", 3),
-    ("Camera -", 3),
-    ("Jitter Off", 4),
-    ("Camera +", 3),
     ("Gaussian", 4),
+    ("Jitter Off", 4),
 )
 
-# Order of the sliders within each panel, independent of the indices above.
-DISPLAY_ORDER = (
-    "Strength +", "Strength -", "Shutter +", "Shutter -",
-    "Streak +", "Streak -", "Threshold",
-    "Camera +", "Camera -", "Force Cut", "Keep Camera",
-    "Gaussian", "Jitter Off",
-)
+# Order of the sliders within each panel.
+DISPLAY_ORDER = tuple(name for name, _ in MORPHS)
 assert sorted(DISPLAY_ORDER) == sorted(name for name, _ in MORPHS)
 
 
 COMMENT_LOCAL = "\r\n".join((
     "AdvancedMotionBlur 控制器　作者：CicloO",
-    "载入后用表情控制动态模糊，可注册关键帧。全部为 0 时与不载入相同。",
+    "",
     "【眉・模糊量】Strength +／-：强度最多加倍／降到 0",
     "【眉・模糊量】Shutter +／-：快门角调到 360°／0°",
-    "【目・拖影长度】Streak +／-：拖影最大长度加倍／降到 0",
     "【目・拖影长度】Threshold：加大速度死区，只糊快的动作",
+    "【目・拖影长度】Streak +／-：拖影最大长度加倍／降到 0",
     "【口・镜头】Camera +／-：只调镜头运动造成的模糊，最多加倍／降到 0（Camera - 为 1 时只剩角色自身动作的模糊）",
     "【口・镜头】Force Cut：≥0.5 时该帧按切镜处理",
     "【口・镜头】Keep Camera：≥0.5 时不做自动切镜判定",

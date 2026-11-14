@@ -23,7 +23,7 @@
 | 眉 | `Shutter +`、`Shutter -` | 从 `MB_SHUTTER_ANGLE` 的基准分别调到 360° 或 0°。基准 180°，`+`=1 时曝光翻倍 |
 | 眼 | `Streak +`、`Streak -` | 分别把 `MB_MAX_STREAK` 增至两倍或降至零。1080p 下基准 64 px 对应 0–128 px |
 | 眼 | `Threshold` | 在 `MB_SPEED_THRESHOLD` 上再加死区，1080p 下最多加 16 px。要更小的死区可直接改设置值 |
-| 口 | `Camera +`、`Camera -` | 只把镜头运动造成的那部分位移增至两倍或降至零，角色自身动作的拖影不变。快速扫镜整幅画面糊得太重时，在那一段注册 `Camera -`。`Camera -` 为 1 时整个画面不再因镜头运动模糊，效果与 `MB_CAMERA_MOTION 0` 相同（0.3.0 的 `Camera Off` 已并入此项，旧工程里的 `Camera Off` 关键帧会对到 `Camera -`）。依赖 `MB_KEEP_OBJECT_MOTION_ON_CUT 1`；该项为 0 时只缩放场景的镜头拖影 |
+| 口 | `Camera +`、`Camera -` | 只把镜头运动造成的那部分位移增至两倍或降至零，角色自身动作的拖影不变。快速扫镜整幅画面糊得太重时，在那一段注册 `Camera -`。`Camera -` 为 1 时整个画面不再因镜头运动模糊，效果与 `MB_CAMERA_MOTION 0` 相同（0.3.0 的 `Camera Off` 已并入此项）。依赖 `MB_KEEP_OBJECT_MOTION_ON_CUT 1`；该项为 0 时只缩放场景的镜头拖影 |
 | 口 | `Force Cut` | 权重达到 0.5 时，强制按切镜处理 |
 | 口 | `Keep Camera` | 权重达到 0.5 时，跳过自动切镜判定。与 `Force Cut` 同时生效时，以 `Force Cut` 为准 |
 | 其他 | `Gaussian` | 在 `MB_STREAK_SOFTNESS` 上叠加，合计到 1 为止。0 时拖影各处权重相同、两端硬截断；1 时沿拖影按高斯分布加权，中间重、两端柔和淡出（MotionBlur3L 的观感）。同样的拖影长度看起来会短一些，可配合 `Streak +` 或 `Strength +` 补回 |
