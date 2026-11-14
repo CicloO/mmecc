@@ -27,6 +27,7 @@
 #define MB_CAMERA_MOTION 1         // 0: model-only blur; camera movement adds no blur anywhere
 #define MB_AUTO_MODEL_MOTION 1     // PMD/PMX use vertex history by default
 #define MB_ACCESSORY_MOTION 0      // 1: .x accessories use rigid matrix history
+#define MB_EXCLUDED_ACCESSORY_RULES "" // Example: "MyEffect.x = NoMotionBlur.fx;"
 #define MB_HISTORY_SIZE 512        // Vertex history atlas size (square) in MotionGeometry.fx
 #define MB_KEEP_OBJECT_MOTION_ON_CUT 1 // 1: models keep their own motion blur on cut frames
 #define MB_TELEPORT_DISTANCE 50.0  // World units per history interval; 0 disables the check

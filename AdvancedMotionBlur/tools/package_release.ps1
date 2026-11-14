@@ -18,10 +18,10 @@ $outputPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromP
 
 $effects = @(
     'AdvancedMotionBlur.x', 'AdvancedMotionBlurController.pmx', 'AdvancedMotionBlur.fx',
-    'DepthVelocity.fx', 'MotionGeometry.fx', 'ObjectMotion.fx', 'RigidMotion.fx',
+    'DepthVelocity.fx', 'MotionGeometry.fx', 'ObjectMotion.fx', 'RigidMotion.fx', 'NoMotionBlur.fx',
     'Camera.fxh', 'Controller.fxh', 'Coverage.fxh', 'Foreground.fxh', 'Fullscreen.fxh',
     'Geometry.fxh', 'HistoryTargets.fxh', 'LinearLight.fxh', 'ModelTiming.fxh',
-    'Outline.fxh', 'RigidHistory.fxh', 'Settings.fxh', 'Readme.txt'
+    'Outline.fxh', 'RigidHistory.fxh', 'Settings.fxh'
 )
 $entries = [ordered]@{}
 foreach ($effect in $effects) {
@@ -29,6 +29,7 @@ foreach ($effect in $effects) {
 }
 $entries.Add('docs/PARAMETERS.md', (Join-Path $project 'docs/PARAMETERS.md'))
 $entries.Add('docs/CHANGELOG.md', (Join-Path $project 'docs/CHANGELOG.md'))
+$entries.Add('Readme.txt', (Join-Path $project 'Readme.txt'))
 
 foreach ($path in $entries.Values) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {

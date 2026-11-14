@@ -29,6 +29,10 @@ float4 BuildMotionField(float2 quadUV : TEXCOORD0) : COLOR0
 {
     float2 uv = quadUV + 0.5 / ScreenSize;
     float4 geometry = tex2Dlod(GeometrySampler, float4(uv, 0.0, 0.0));
+    [branch]
+    if (geometry.a == ExcludedCoverage) {
+        return geometry;
+    }
     float4 camera = CurrentCameraAnalysis();
     float dt = CameraBlurInterval(camera);
     float exposure = camera.y;

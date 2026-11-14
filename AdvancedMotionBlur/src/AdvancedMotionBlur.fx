@@ -62,6 +62,7 @@ texture GeometryData : OFFSCREENRENDERTARGET <
     string DefaultEffect =
         "self = hide;"
         MB_CONTROLLER_NAME " = hide;"
+        MB_EXCLUDED_ACCESSORY_RULES
 #if MB_AUTO_MODEL_MOTION
         "*.pmx = MotionGeometry.fx;"
         "*.pmd = MotionGeometry.fx;"
@@ -232,7 +233,7 @@ static const float MaxTaps = 64.0;
 
 float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
 {
-    bool outline = geometry.a > 3.5 && !IsAdditive(geometry.a);
+    bool outline = geometry.a > 3.5 && !IsProtectedSurface(geometry.a);
     float streakLength = length(streak);
     if (streakLength < MinStreak() || (color.a <= 0.004 && !outline)) {
         return color;
@@ -283,7 +284,7 @@ float4 BlurSurface(float2 uv, float4 color, float4 geometry, float2 streak)
         float weight = inside * TapWeight(geometry, tapGeometry, 1.0);
         sum += DecodeTrailColor(tapColor) * weight;
 #else
-        float alpha = tapGeometry.a > 3.5 && !IsAdditive(tapGeometry.a) ? 1.0 : tapColor.a;
+        float alpha = tapGeometry.a > 3.5 && !IsProtectedSurface(tapGeometry.a) ? 1.0 : tapColor.a;
         float weight = inside * TapWeight(geometry, tapGeometry, alpha);
         sum += DecodeTrailColor(tapColor).rgb * weight;
 #endif
@@ -313,7 +314,7 @@ float4 Reconstruct(float2 quadUV : TEXCOORD0) : COLOR0
     float depth = saturate((geometry.b + 2.0) / 11.0);
     return float4(depth.xxx * HasGeometryCoverage(geometry.a), 1.0);
 #elif MB_DEBUG == 4
-    if (IsOrdinaryTranslucent(geometry.a) || IsAdditive(geometry.a)) {
+    if (IsOrdinaryTranslucent(geometry.a) || IsAdditive(geometry.a) || geometry.a == ExcludedCoverage) {
         return float4(1.0, 0.0, 0.0, 1.0);
     }
     if (geometry.a > 3.5) {
